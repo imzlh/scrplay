@@ -44,9 +44,9 @@ ninja -C "$WINXX_BUILD_DIR"
 
 # Group intermediate outputs into a 'dist' directory
 mkdir -p "$WINXX_BUILD_DIR/dist"
-cp "$WINXX_BUILD_DIR"/app/scrcpy.exe "$WINXX_BUILD_DIR/dist/"
-cp app/data/scrcpy-console.bat "$WINXX_BUILD_DIR/dist/"
-cp app/data/scrcpy-noconsole.vbs "$WINXX_BUILD_DIR/dist/"
+cp "$WINXX_BUILD_DIR"/app/scrplay.exe "$WINXX_BUILD_DIR/dist/"
+cp app/data/scrplay-console.bat "$WINXX_BUILD_DIR/dist/"
+cp app/data/scrplay-noconsole.vbs "$WINXX_BUILD_DIR/dist/"
 cp app/data/icon.png "$WINXX_BUILD_DIR/dist/"
 cp app/data/open_a_terminal_here.bat "$WINXX_BUILD_DIR/dist/"
 cp "$DEPS_INSTALL_DIR"/bin/*.dll "$WINXX_BUILD_DIR/dist/"

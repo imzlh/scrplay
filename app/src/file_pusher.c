@@ -161,7 +161,7 @@ bool
 sc_file_pusher_start(struct sc_file_pusher *fp) {
     LOGD("Starting file_pusher thread");
 
-    bool ok = sc_thread_create(&fp->thread, run_file_pusher, "scrcpy-file", fp);
+    bool ok = sc_thread_create(&fp->thread, run_file_pusher, "scrplay-file", fp);
     if (!ok) {
         LOGE("Could not start file_pusher thread");
         return false;

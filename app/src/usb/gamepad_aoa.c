@@ -19,7 +19,7 @@ sc_gamepad_processor_process_gamepad_added(struct sc_gamepad_processor *gp,
         return;
     }
 
-    // exit_on_error: false (a gamepad open failure should not exit scrcpy)
+    // exit_on_error: false (a gamepad open failure should not exit scrplay)
     if (!sc_aoa_push_open(gamepad->aoa, &hid_open, false)) {
         LOGW("Could not push AOA HID open (gamepad)");
     }

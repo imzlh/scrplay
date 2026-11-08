@@ -31,7 +31,7 @@ sc_demuxer_to_avcodec_id(uint32_t codec_id) {
         case SC_CODEC_ID_H265:
             return AV_CODEC_ID_HEVC;
         case SC_CODEC_ID_AV1:
-#ifdef SCRCPY_LAVC_HAS_AV1
+#ifdef SCRPLAY_LAVC_HAS_AV1
             return AV_CODEC_ID_AV1;
 #else
             LOGE("AV1 not supported by this FFmpeg version");
@@ -200,7 +200,7 @@ run_demuxer(void *data) {
         codec_ctx->pix_fmt = AV_PIX_FMT_YUV420P;
     } else {
         // Hardcoded audio properties
-#ifdef SCRCPY_LAVU_HAS_CHLAYOUT
+#ifdef SCRPLAY_LAVU_HAS_CHLAYOUT
         codec_ctx->ch_layout = (AVChannelLayout) AV_CHANNEL_LAYOUT_STEREO;
 #else
         codec_ctx->channel_layout = AV_CH_LAYOUT_STEREO;
@@ -301,7 +301,7 @@ bool
 sc_demuxer_start(struct sc_demuxer *demuxer) {
     LOGD("Demuxer '%s': starting thread", demuxer->name);
 
-    bool ok = sc_thread_create(&demuxer->thread, run_demuxer, "scrcpy-demuxer",
+    bool ok = sc_thread_create(&demuxer->thread, run_demuxer, "scrplay-demuxer",
                                demuxer);
     if (!ok) {
         LOGE("Demuxer '%s': could not start thread", demuxer->name);

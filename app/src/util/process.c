@@ -62,7 +62,7 @@ sc_process_observer_init(struct sc_process_observer *observer, sc_pid pid,
     observer->listener_userdata = listener_userdata;
     observer->terminated = false;
 
-    ok = sc_thread_create(&observer->thread, run_observer, "scrcpy-proc",
+    ok = sc_thread_create(&observer->thread, run_observer, "scrplay-proc",
                           observer);
     if (!ok) {
         sc_cond_destroy(&observer->cond_terminated);

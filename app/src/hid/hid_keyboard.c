@@ -20,7 +20,7 @@
 
 // USB HID protocol says 6 keys in an event is the requirement for BIOS
 // keyboard support, though OS could support more keys via modifying the report
-// desc. 6 should be enough for scrcpy.
+// desc. 6 should be enough for scrplay.
 #define SC_HID_KEYBOARD_MAX_KEYS 6
 #define SC_HID_KEYBOARD_INPUT_SIZE \
     (SC_HID_KEYBOARD_INDEX_KEYS + SC_HID_KEYBOARD_MAX_KEYS)

@@ -13,7 +13,7 @@
 #include <SDL2/SDL_version.h>
 
 void
-scrcpy_print_version(void) {
+scrplay_print_version(void) {
     printf("\nDependencies (compiled / linked):\n");
 
     SDL_version sdl;

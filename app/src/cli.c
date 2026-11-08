@@ -1,7 +1,10 @@
 #include "cli.h"
 
 #include <assert.h>
+#include <ctype.h>
+#include <errno.h>
 #include <getopt.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,6 +117,10 @@ enum {
     OPT_NO_VD_SYSTEM_DECORATIONS,
     OPT_NO_VD_DESTROY_CONTENT,
     OPT_DISPLAY_IME_POLICY,
+    OPT_GAME_MODE,
+    OPT_GAME_PROFILE,
+    OPT_GAME_FONT,
+    OPT_GAME_UI_SCALE,
 };
 
 struct sc_option {
@@ -153,7 +160,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_ALWAYS_ON_TOP,
         .longopt = "always-on-top",
-        .text = "Make scrcpy window always on top (above other windows).",
+        .text = "Make scrplay window always on top (above other windows).",
     },
     {
         .longopt_id = OPT_ANGLE,
@@ -305,7 +312,7 @@ static const struct sc_option options[] = {
         .argdesc = "id",
         .text = "Specify the device camera id to mirror.\n"
                 "The available camera ids can be listed by:\n"
-                "    scrcpy --list-cameras",
+                "    scrplay --list-cameras",
     },
     {
         .longopt_id = OPT_CAMERA_SIZE,
@@ -362,7 +369,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_DISABLE_SCREENSAVER,
         .longopt = "disable-screensaver",
-        .text = "Disable screensaver while scrcpy is running.",
+        .text = "Disable screensaver while scrplay is running.",
     },
     {
         // deprecated
@@ -382,7 +389,7 @@ static const struct sc_option options[] = {
         .argdesc = "id",
         .text = "Specify the device display id to mirror.\n"
                 "The available display ids can be listed by:\n"
-                "    scrcpy --list-displays\n"
+                "    scrplay --list-displays\n"
                 "Default is 0.",
     },
     {
@@ -397,6 +404,40 @@ static const struct sc_option options[] = {
                 "\"fallback\" means that the IME should appear on a fallback "
                 "display (the default display).\n"
                 "\"hide\" means that the IME should be hidden.",
+    },
+    {
+        .longopt_id = OPT_GAME_MODE,
+        .longopt = "game-mode",
+        .text = "Enable game mode: keyboard/mouse mappings for mobile games,\n"
+                "with an in-window UI to edit profiles and presets.\n"
+                "WASD controls a virtual joystick, the captured mouse drags "
+                "the\nview. Hold either Alt key to temporarily release mouse "
+                "capture;\ncapture resumes after all Alt keys are released.\n"
+                "Use Shift+E to open the editor UI at runtime.",
+    },
+    {
+        .longopt_id = OPT_GAME_PROFILE,
+        .longopt = "game-profile",
+        .argdesc = "name",
+        .text = "Select the game profile to load (see --game-mode).\n"
+                "If not specified, the single existing profile is selected, "
+                "or\nan in-window picker is displayed.",
+    },
+    {
+        .longopt_id = OPT_GAME_FONT,
+        .longopt = "game-font",
+        .argdesc = "path",
+        .text = "Path of a TTF font for the game mode UI\n"
+                "(auto-detected by default, must support Chinese).",
+    },
+    {
+        .longopt_id = OPT_GAME_UI_SCALE,
+        .longopt = "game-ui-scale",
+        .argdesc = "factor",
+        .text = "Scale factor for the game mode UI (font, panel, controls).\n"
+                "Defaults to auto-detecting the desktop scaling (e.g. 1.25 "
+                "for a\n125% HiDPI display). The accepted range is 0.5 to "
+                "4.0.",
     },
     {
         .longopt_id = OPT_DISPLAY_ORIENTATION,
@@ -490,7 +531,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_KILL_ADB_ON_CLOSE,
         .longopt = "kill-adb-on-close",
-        .text = "Kill adb when scrcpy terminates.",
+        .text = "Kill adb when scrplay terminates.",
     },
     {
         // deprecated
@@ -645,7 +686,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_NO_CLEANUP,
         .longopt = "no-cleanup",
-        .text = "By default, scrcpy removes the server binary from the device "
+        .text = "By default, scrplay removes the server binary from the device "
                 "and restores the device state (show touches, stay awake and "
                 "power mode) on exit.\n"
                 "This option disables this cleanup."
@@ -653,7 +694,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_NO_CLIPBOARD_AUTOSYNC,
         .longopt = "no-clipboard-autosync",
-        .text = "By default, scrcpy automatically synchronizes the computer "
+        .text = "By default, scrplay automatically synchronizes the computer "
                 "clipboard to the device clipboard before injecting Ctrl+v, "
                 "and the device clipboard to the computer clipboard whenever "
                 "it changes.\n"
@@ -662,7 +703,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_NO_DOWNSIZE_ON_ERROR,
         .longopt = "no-downsize-on-error",
-        .text = "By default, on MediaCodec error, scrcpy automatically tries "
+        .text = "By default, on MediaCodec error, scrplay automatically tries "
                 "again with a lower definition.\n"
                 "This option disables this behavior.",
     },
@@ -721,7 +762,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_NO_WINDOW,
         .longopt = "no-window",
-        .text = "Disable scrcpy window. Implies --no-video-playback.",
+        .text = "Disable scrplay window. Implies --no-video-playback.",
     },
     {
         .longopt_id = OPT_ORIENTATION,
@@ -770,7 +811,7 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_POWER_OFF_ON_CLOSE,
         .longopt = "power-off-on-close",
-        .text = "Turn the device screen off when closing scrcpy.",
+        .text = "Turn the device screen off when closing scrplay.",
     },
     {
         .longopt_id = OPT_PREFER_TEXT,
@@ -837,8 +878,8 @@ static const struct sc_option options[] = {
     {
         .longopt_id = OPT_REQUIRE_AUDIO,
         .longopt = "require-audio",
-        .text = "By default, scrcpy mirrors only the video when audio capture "
-                "fails on the device. This option makes scrcpy fail if audio "
+        .text = "By default, scrplay mirrors only the video when audio capture "
+                "fails on the device. This option makes scrplay fail if audio "
                 "is enabled but does not work."
     },
     {
@@ -863,19 +904,19 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_SCREEN_OFF_TIMEOUT,
         .longopt = "screen-off-timeout",
         .argdesc = "seconds",
-        .text = "Set the screen off timeout while scrcpy is running (restore "
+        .text = "Set the screen off timeout while scrplay is running (restore "
                 "the initial value on exit).",
     },
     {
         .longopt_id = OPT_SHORTCUT_MOD,
         .longopt = "shortcut-mod",
         .argdesc = "key[+...][,...]",
-        .text = "Specify the modifiers to use for scrcpy shortcuts.\n"
+        .text = "Specify the modifiers to use for scrplay shortcuts.\n"
                 "Possible keys are \"lctrl\", \"rctrl\", \"lalt\", \"ralt\", "
                 "\"lsuper\" and \"rsuper\".\n"
                 "Several shortcut modifiers can be specified, separated by "
                 "','.\n"
-                "For example, to use either LCtrl or LSuper for scrcpy "
+                "For example, to use either LCtrl or LSuper for scrplay "
                 "shortcuts, pass \"lctrl,lsuper\".\n"
                 "Default is \"lalt,lsuper\" (left-Alt or left-Super).",
     },
@@ -887,18 +928,18 @@ static const struct sc_option options[] = {
                 "Add a '?' prefix to select an app whose name starts with the "
                 "given name, case-insensitive (retrieving app names on the "
                 "device may take some time):\n"
-                "    scrcpy --start-app=?firefox\n"
+                "    scrplay --start-app=?firefox\n"
                 "Add a '+' prefix to force-stop before starting the app:\n"
-                "    scrcpy --new-display --start-app=+org.mozilla.firefox\n"
+                "    scrplay --new-display --start-app=+org.mozilla.firefox\n"
                 "Both prefixes can be used, in that order:\n"
-                "    scrcpy --start-app=+?firefox",
+                "    scrplay --start-app=+?firefox",
     },
     {
         .shortopt = 't',
         .longopt = "show-touches",
         .text = "Enable \"show touches\" on start, restore the initial value "
                 "on exit.\n"
-                "It only shows physical touches (not clicks from scrcpy).",
+                "It only shows physical touches (not clicks from scrplay).",
     },
     {
         .longopt_id = OPT_TCPIP,
@@ -906,10 +947,10 @@ static const struct sc_option options[] = {
         .argdesc = "[+]ip[:port]",
         .optional_arg = true,
         .text = "Configure and connect the device over TCP/IP.\n"
-                "If a destination address is provided, then scrcpy connects to "
+                "If a destination address is provided, then scrplay connects to "
                 "this address before starting. The device must listen on the "
                 "given TCP port (default is 5555).\n"
-                "If no destination address is provided, then scrcpy attempts "
+                "If no destination address is provided, then scrplay attempts "
                 "to find the IP address of the current device (typically "
                 "connected over USB), enables TCP/IP mode, then connects to "
                 "this address before starting.\n"
@@ -925,7 +966,7 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_TUNNEL_HOST,
         .longopt = "tunnel-host",
         .argdesc = "ip",
-        .text = "Set the IP address of the adb tunnel to reach the scrcpy "
+        .text = "Set the IP address of the adb tunnel to reach the scrplay "
                 "server. This option automatically enables "
                 "--force-adb-forward.\n"
                 "Default is localhost.",
@@ -934,7 +975,7 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_TUNNEL_PORT,
         .longopt = "tunnel-port",
         .argdesc = "port",
-        .text = "Set the TCP port of the adb tunnel to reach the scrcpy "
+        .text = "Set the TCP port of the adb tunnel to reach the scrplay "
                 "server. This option automatically enables "
                 "--force-adb-forward.\n"
                 "Default is 0 (not forced): the local port used for "
@@ -943,7 +984,7 @@ static const struct sc_option options[] = {
     {
         .shortopt = 'v',
         .longopt = "version",
-        .text = "Print the version of scrcpy.",
+        .text = "Print the version of scrplay.",
     },
     {
         .shortopt = 'V',
@@ -1021,7 +1062,7 @@ static const struct sc_option options[] = {
     {
         .shortopt = 'w',
         .longopt = "stay-awake",
-        .text = "Keep the device on while scrcpy is running, when the device "
+        .text = "Keep the device on while scrplay is running, when the device "
                 "is plugged in.",
     },
     {
@@ -1220,11 +1261,11 @@ static const struct sc_envvar envvars[] = {
                 "--tcpip=<addr>) is specified",
     },
     {
-        .name = "SCRCPY_ICON_PATH",
+        .name = "SCRPLAY_ICON_PATH",
         .text = "Path to the program icon",
     },
     {
-        .name = "SCRCPY_SERVER_PATH",
+        .name = "SCRPLAY_SERVER_PATH",
         .text = "Path to the server binary",
     },
 };
@@ -1500,7 +1541,7 @@ print_exit_status(const struct sc_exit_status *status, unsigned cols) {
 }
 
 void
-scrcpy_print_usage(const char *arg0) {
+scrplay_print_usage(const char *arg0) {
 #define SC_TERM_COLS_DEFAULT 80
     unsigned cols;
 
@@ -1588,6 +1629,37 @@ parse_integers_arg(const char *s, const char sep, size_t max_items, long *out,
     }
 
     return count;
+}
+
+static bool
+parse_game_ui_scale(const char *s, float *scale) {
+#define SC_GAME_UI_SCALE_MIN 0.5f
+#define SC_GAME_UI_SCALE_MAX 4.0f
+    if (!*s || isspace((unsigned char) *s)) {
+        LOGE("Could not parse game UI scale: %s", s);
+        return false;
+    }
+
+    errno = 0;
+    char *end;
+    float value = strtof(s, &end);
+    if (end == s || *end || errno == ERANGE || !isfinite(value)) {
+        LOGE("Could not parse game UI scale: %s", s);
+        return false;
+    }
+
+    if (value < SC_GAME_UI_SCALE_MIN || value > SC_GAME_UI_SCALE_MAX) {
+        LOGE("Could not parse game UI scale: value (%g) out-of-range "
+             "(%.1f; %.1f)", (double) value,
+             (double) SC_GAME_UI_SCALE_MIN,
+             (double) SC_GAME_UI_SCALE_MAX);
+        return false;
+    }
+
+    *scale = value;
+    return true;
+#undef SC_GAME_UI_SCALE_MIN
+#undef SC_GAME_UI_SCALE_MAX
 }
 
 static bool
@@ -2354,9 +2426,9 @@ parse_mouse_bindings(const char *s, struct sc_mouse_bindings *mb) {
 }
 
 static bool
-parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
+parse_args_with_getopt(struct scrplay_cli_args *args, int argc, char *argv[],
                        const char *optstring, const struct option *longopts) {
-    struct scrcpy_options *opts = &args->opts;
+    struct scrplay_options *opts = &args->opts;
 
     optind = 0; // reset to start from the first argument in tests
 
@@ -2821,6 +2893,20 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
                     return false;
                 }
                 break;
+            case OPT_GAME_MODE:
+                opts->game_mode = true;
+                break;
+            case OPT_GAME_PROFILE:
+                opts->game_profile = optarg;
+                break;
+            case OPT_GAME_FONT:
+                opts->game_font = optarg;
+                break;
+            case OPT_GAME_UI_SCALE:
+                if (!parse_game_ui_scale(optarg, &opts->game_ui_scale)) {
+                    return false;
+                }
+                break;
             default:
                 // getopt prints the error message on stderr
                 return false;
@@ -2892,7 +2978,7 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
     }
 
     if (!opts->video && !otg) {
-        // If video is disabled, then scrcpy must exit on audio failure.
+        // If video is disabled, then scrplay must exit on audio failure.
         opts->require_audio = true;
     }
 
@@ -3352,7 +3438,7 @@ sc_get_pause_on_exit(int argc, char *argv[]) {
 }
 
 bool
-scrcpy_parse_args(struct scrcpy_cli_args *args, int argc, char *argv[]) {
+scrplay_parse_args(struct scrplay_cli_args *args, int argc, char *argv[]) {
     struct sc_getopt_adapter adapter;
     if (!sc_getopt_adapter_init(&adapter)) {
         LOGW("Could not create getopt adapter");

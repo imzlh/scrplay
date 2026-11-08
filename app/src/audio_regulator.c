@@ -27,7 +27,7 @@
  * of samples present in the buffer) around a target value. If this target
  * buffering is too low, then buffer underrun will occur frequently. If it is
  * too high, then latency will become unacceptable. This target value is
- * configured using the scrcpy option --audio-buffer.
+ * configured using the scrplay option --audio-buffer.
  *
  * The regulator cannot adjust the sample input rate (it receives samples
  * produced in real-time) or the sample output rate (it must provide samples as
@@ -372,7 +372,7 @@ sc_audio_regulator_init(struct sc_audio_regulator *ar, size_t sample_size,
     }
     ar->swr_ctx = swr_ctx;
 
-#ifdef SCRCPY_LAVU_HAS_CHLAYOUT
+#ifdef SCRPLAY_LAVU_HAS_CHLAYOUT
     av_opt_set_chlayout(swr_ctx, "in_chlayout", &ctx->ch_layout, 0);
     av_opt_set_chlayout(swr_ctx, "out_chlayout", &ctx->ch_layout, 0);
 #else

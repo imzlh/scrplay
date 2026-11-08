@@ -19,28 +19,28 @@
 #endif
 #include "util/log.h"
 
-#define SCRCPY_PORTABLE_ICON_FILENAME "icon.png"
-#define SCRCPY_DEFAULT_ICON_PATH \
-    PREFIX "/share/icons/hicolor/256x256/apps/scrcpy.png"
+#define SCRPLAY_PORTABLE_ICON_FILENAME "icon.png"
+#define SCRPLAY_DEFAULT_ICON_PATH \
+    PREFIX "/share/icons/hicolor/256x256/apps/scrplay.png"
 
 static char *
 get_icon_path(void) {
-    char *icon_path = sc_get_env("SCRCPY_ICON_PATH");
+    char *icon_path = sc_get_env("SCRPLAY_ICON_PATH");
     if (icon_path) {
         // if the envvar is set, use it
-        LOGD("Using SCRCPY_ICON_PATH: %s", icon_path);
+        LOGD("Using SCRPLAY_ICON_PATH: %s", icon_path);
         return icon_path;
     }
 
 #ifndef PORTABLE
-    LOGD("Using icon: " SCRCPY_DEFAULT_ICON_PATH);
-    icon_path = strdup(SCRCPY_DEFAULT_ICON_PATH);
+    LOGD("Using icon: " SCRPLAY_DEFAULT_ICON_PATH);
+    icon_path = strdup(SCRPLAY_DEFAULT_ICON_PATH);
     if (!icon_path) {
         LOG_OOM();
         return NULL;
     }
 #else
-    icon_path = sc_file_get_local_path(SCRCPY_PORTABLE_ICON_FILENAME);
+    icon_path = sc_file_get_local_path(SCRPLAY_PORTABLE_ICON_FILENAME);
     if (!icon_path) {
         LOGE("Could not get icon path");
         return NULL;
@@ -268,7 +268,7 @@ error:
 }
 
 SDL_Surface *
-scrcpy_icon_load(void) {
+scrplay_icon_load(void) {
     char *icon_path = get_icon_path();
     if (!icon_path) {
         return NULL;
@@ -280,7 +280,7 @@ scrcpy_icon_load(void) {
 }
 
 void
-scrcpy_icon_destroy(SDL_Surface *icon) {
+scrplay_icon_destroy(SDL_Surface *icon) {
     AVFrame *frame = icon->userdata;
     assert(frame);
     av_frame_free(&frame);

@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-const struct scrcpy_options scrcpy_options_default = {
+const struct scrplay_options scrplay_options_default = {
     .serial = NULL,
     .crop = NULL,
     .record_filename = NULL,
@@ -48,6 +48,10 @@ const struct scrcpy_options scrcpy_options_default = {
     .tunnel_host = 0,
     .tunnel_port = 0,
     .shortcut_mods = SC_SHORTCUT_MOD_LALT | SC_SHORTCUT_MOD_LSUPER,
+    .game_mode = false,
+    .game_profile = NULL,
+    .game_font = NULL,
+    .game_ui_scale = 0,
     .max_size = 0,
     .video_bit_rate = 0,
     .audio_bit_rate = 0,

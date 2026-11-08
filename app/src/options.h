@@ -1,5 +1,5 @@
-#ifndef SCRCPY_OPTIONS_H
-#define SCRCPY_OPTIONS_H
+#ifndef SCRPLAY_OPTIONS_H
+#define SCRPLAY_OPTIONS_H
 
 #include "common.h"
 
@@ -227,7 +227,7 @@ struct sc_port_range {
 
 #define SC_WINDOW_POSITION_UNDEFINED (-0x8000)
 
-struct scrcpy_options {
+struct scrplay_options {
     const char *serial;
     const char *crop;
     const char *record_filename;
@@ -327,8 +327,14 @@ struct scrcpy_options {
     const char *start_app;
     bool vd_destroy_content;
     bool vd_system_decorations;
+
+    // game mode
+    bool game_mode;
+    const char *game_profile; // profile name (NULL: auto-select)
+    const char *game_font; // TTF font override (NULL: auto-detect)
+    float game_ui_scale; // UI scale override (0: auto-detect desktop scaling)
 };
 
-extern const struct scrcpy_options scrcpy_options_default;
+extern const struct scrplay_options scrplay_options_default;
 
 #endif

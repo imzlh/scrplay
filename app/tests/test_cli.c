@@ -7,44 +7,44 @@
 #include "options.h"
 
 static void test_flag_version(void) {
-    struct scrcpy_cli_args args = {
-        .opts = scrcpy_options_default,
+    struct scrplay_cli_args args = {
+        .opts = scrplay_options_default,
         .help = false,
         .version = false,
     };
 
-    char *argv[] = {"scrcpy", "-v"};
+    char *argv[] = {"scrplay", "-v"};
 
-    bool ok = scrcpy_parse_args(&args, 2, argv);
+    bool ok = scrplay_parse_args(&args, 2, argv);
     assert(ok);
     assert(!args.help);
     assert(args.version);
 }
 
 static void test_flag_help(void) {
-    struct scrcpy_cli_args args = {
-        .opts = scrcpy_options_default,
+    struct scrplay_cli_args args = {
+        .opts = scrplay_options_default,
         .help = false,
         .version = false,
     };
 
-    char *argv[] = {"scrcpy", "-v"};
+    char *argv[] = {"scrplay", "-v"};
 
-    bool ok = scrcpy_parse_args(&args, 2, argv);
+    bool ok = scrplay_parse_args(&args, 2, argv);
     assert(ok);
     assert(!args.help);
     assert(args.version);
 }
 
 static void test_options(void) {
-    struct scrcpy_cli_args args = {
-        .opts = scrcpy_options_default,
+    struct scrplay_cli_args args = {
+        .opts = scrplay_options_default,
         .help = false,
         .version = false,
     };
 
     char *argv[] = {
-        "scrcpy",
+        "scrplay",
         "--always-on-top",
         "--video-bit-rate", "5M",
         "--crop", "100:200:300:400",
@@ -69,10 +69,10 @@ static void test_options(void) {
         "--window-borderless",
     };
 
-    bool ok = scrcpy_parse_args(&args, ARRAY_LEN(argv), argv);
+    bool ok = scrplay_parse_args(&args, ARRAY_LEN(argv), argv);
     assert(ok);
 
-    const struct scrcpy_options *opts = &args.opts;
+    const struct scrplay_options *opts = &args.opts;
     assert(opts->always_on_top);
     assert(opts->video_bit_rate == 5000000);
     assert(!strcmp(opts->crop, "100:200:300:400"));
@@ -97,23 +97,23 @@ static void test_options(void) {
 }
 
 static void test_options2(void) {
-    struct scrcpy_cli_args args = {
-        .opts = scrcpy_options_default,
+    struct scrplay_cli_args args = {
+        .opts = scrplay_options_default,
         .help = false,
         .version = false,
     };
 
     char *argv[] = {
-        "scrcpy",
+        "scrplay",
         "--no-control",
         "--no-playback",
         "--record", "file.mp4", // cannot enable --no-playback without recording
     };
 
-    bool ok = scrcpy_parse_args(&args, ARRAY_LEN(argv), argv);
+    bool ok = scrplay_parse_args(&args, ARRAY_LEN(argv), argv);
     assert(ok);
 
-    const struct scrcpy_options *opts = &args.opts;
+    const struct scrplay_options *opts = &args.opts;
     assert(!opts->control);
     assert(!opts->video_playback);
     assert(!opts->audio_playback);
@@ -149,6 +149,41 @@ static void test_parse_shortcut_mods(void) {
     assert(!ok);
 }
 
+static bool
+parse_game_ui_scale(const char *value, float *result) {
+    struct scrplay_cli_args args = {
+        .opts = scrplay_options_default,
+        .help = false,
+        .version = false,
+    };
+    char *argv[] = {"scrplay", "--game-ui-scale", (char *) value};
+
+    bool ok = scrplay_parse_args(&args, ARRAY_LEN(argv), argv);
+    if (ok) {
+        *result = args.opts.game_ui_scale;
+    }
+    return ok;
+}
+
+static void test_game_ui_scale(void) {
+    float scale;
+
+    assert(parse_game_ui_scale("0.5", &scale));
+    assert(scale == 0.5f);
+    assert(parse_game_ui_scale("1.25", &scale));
+    assert(scale == 1.25f);
+    assert(parse_game_ui_scale("4.0", &scale));
+    assert(scale == 4.0f);
+
+    const char *invalid[] = {
+        "", " 1", "1 ", "1.25garbage", "nan", "inf", "-inf",
+        "0", "0.49", "4.01", "1e999",
+    };
+    for (size_t i = 0; i < ARRAY_LEN(invalid); ++i) {
+        assert(!parse_game_ui_scale(invalid[i], &scale));
+    }
+}
+
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
@@ -158,5 +193,6 @@ int main(int argc, char *argv[]) {
     test_options();
     test_options2();
     test_parse_shortcut_mods();
+    test_game_ui_scale();
     return 0;
 }

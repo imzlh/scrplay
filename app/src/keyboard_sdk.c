@@ -1,7 +1,6 @@
 #include "keyboard_sdk.h"
 
 #include <assert.h>
-#include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -305,18 +304,40 @@ sc_key_processor_process_text(struct sc_key_processor *kp,
         return;
     }
 
-    if (kb->key_inject_mode == SC_KEY_INJECT_MODE_MIXED) {
-        char c = event->text[0];
-        if (isalpha(c) || c == ' ') {
-            assert(event->text[1] == '\0');
-            // Letters and space are handled as raw key events
-            return;
-        }
-    }
-
     struct sc_control_msg msg;
     msg.type = SC_CONTROL_MSG_TYPE_INJECT_TEXT;
-    msg.inject_text.text = strdup(event->text);
+    if (kb->key_inject_mode == SC_KEY_INJECT_MODE_MIXED) {
+        // SDL_TEXTINPUT is a UTF-8 string, not necessarily one character.
+        // IMEs and some desktop backends may commit several characters at
+        // once (for example "www" or "a!b"). ASCII letters and spaces are
+        // already injected from their raw key events in MIXED mode, so strip
+        // only those bytes and preserve every other byte verbatim. Non-ASCII
+        // UTF-8 sequences never contain ASCII bytes and therefore remain
+        // intact.
+        size_t len = strlen(event->text);
+        char *filtered = malloc(len + 1);
+        if (!filtered) {
+            LOGW("Could not allocate filtered input text");
+            return;
+        }
+        size_t out = 0;
+        for (size_t i = 0; i < len; ++i) {
+            unsigned char c = (unsigned char) event->text[i];
+            bool raw = (c >= 'A' && c <= 'Z')
+                    || (c >= 'a' && c <= 'z') || c == ' ';
+            if (!raw) {
+                filtered[out++] = (char) c;
+            }
+        }
+        if (!out) {
+            free(filtered);
+            return;
+        }
+        filtered[out] = '\0';
+        msg.inject_text.text = filtered;
+    } else {
+        msg.inject_text.text = strdup(event->text);
+    }
     if (!msg.inject_text.text) {
         LOGW("Could not strdup input text");
         return;

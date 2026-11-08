@@ -10,34 +10,34 @@
 
 #include "coords.h"
 
-/* The representation of input events in scrcpy is very close to the SDL API,
+/* The representation of input events in scrplay is very close to the SDL API,
  * for simplicity.
  *
- * This scrcpy input events API is designed to be consumed by input event
+ * This scrplay input events API is designed to be consumed by input event
  * processors (sc_key_processor and sc_mouse_processor, see app/src/trait/).
  *
- * One major semantic difference between SDL input events and scrcpy input
+ * One major semantic difference between SDL input events and scrplay input
  * events is their frame of reference (for mouse and touch events): SDL events
  * coordinates are expressed in SDL window coordinates (the visible UI), while
- * scrcpy events are expressed in device frame coordinates.
+ * scrplay events are expressed in device frame coordinates.
  *
  * In particular, the window may be visually scaled or rotated (with --rotation
- * or MOD+Left/Right), but this does not impact scrcpy input events (contrary
+ * or MOD+Left/Right), but this does not impact scrplay input events (contrary
  * to SDL input events). This allows to abstract these display details from the
  * input event processors (and to make them independent from the "screen").
  *
  * For many enums below, the values are purposely the same as the SDL
  * constants (though not all SDL values are represented), so that the
- * implementation to convert from the SDL version to the scrcpy version is
+ * implementation to convert from the SDL version to the scrplay version is
  * straightforward.
  *
  * In practice, there are 3 levels of input events:
  *  1. SDL input events (as received from SDL)
- *  2. scrcpy input events (this API)
+ *  2. scrplay input events (this API)
  *  3. the key/mouse processors input events (Android API or HID events)
  *
  * An input event is first received (1), then (if accepted) converted to an
- * scrcpy input event (2), then submitted to the relevant key/mouse processor,
+ * scrplay input event (2), then submitted to the relevant key/mouse processor,
  * which (if accepted) is converted to an Android event (to be sent to the
  * server) or to an HID event (to be sent over USB/AOA directly).
  */

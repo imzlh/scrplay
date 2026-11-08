@@ -33,7 +33,7 @@ sc_audio_player_frame_sink_open(struct sc_frame_sink *sink,
                                 const AVCodecContext *ctx) {
     struct sc_audio_player *ap = DOWNCAST(sink);
 
-#ifdef SCRCPY_LAVU_HAS_CHLAYOUT
+#ifdef SCRPLAY_LAVU_HAS_CHLAYOUT
     assert(ctx->ch_layout.nb_channels > 0 && ctx->ch_layout.nb_channels < 256);
     uint8_t nb_channels = ctx->ch_layout.nb_channels;
 #else

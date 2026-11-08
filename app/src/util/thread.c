@@ -31,7 +31,7 @@ static SDL_ThreadPriority
 to_sdl_thread_priority(enum sc_thread_priority priority) {
     switch (priority) {
         case SC_THREAD_PRIORITY_TIME_CRITICAL:
-#ifdef SCRCPY_SDL_HAS_THREAD_PRIORITY_TIME_CRITICAL
+#ifdef SCRPLAY_SDL_HAS_THREAD_PRIORITY_TIME_CRITICAL
             return SDL_THREAD_PRIORITY_TIME_CRITICAL;
 #else
             // fall through

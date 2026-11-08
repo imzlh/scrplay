@@ -347,7 +347,7 @@ sc_usb_connect(struct sc_usb *usb, libusb_device *device,
             // disconnection could be detected immediately
             usb->has_libusb_event_thread =
                 sc_thread_create(&usb->libusb_event_thread,
-                                 run_libusb_event_handler, "scrcpy-usbev", usb);
+                                 run_libusb_event_handler, "scrplay-usbev", usb);
             if (!usb->has_libusb_event_thread) {
                 LOGW("Libusb event thread handler could not be created, USB "
                      "device disconnection might not be detected immediately");

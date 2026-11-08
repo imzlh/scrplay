@@ -15,20 +15,25 @@
 #include "util/process.h"
 #include "util/str.h"
 
-#define SC_SERVER_FILENAME "scrcpy-server"
+#define SC_SERVER_FILENAME "scrplay-server"
 
-#define SC_SERVER_PATH_DEFAULT PREFIX "/share/scrcpy/" SC_SERVER_FILENAME
-#define SC_DEVICE_SERVER_PATH "/data/local/tmp/scrcpy-server.jar"
+#define SC_SERVER_PATH_DEFAULT PREFIX "/share/scrplay/" SC_SERVER_FILENAME
+#define SC_DEVICE_SERVER_PATH "/data/local/tmp/scrplay-server.jar"
 
 #define SC_ADB_PORT_DEFAULT 5555
+
+// The prebuilt server (an upstream binary which still carries the legacy
+// product name) derives the device-side abstract socket name itself from
+// that legacy name plus the scid, so this prefix is part of the wire
+// protocol and must not be renamed.
 #define SC_SOCKET_NAME_PREFIX "scrcpy_"
 
 static char *
 get_server_path(void) {
-    char *server_path = sc_get_env("SCRCPY_SERVER_PATH");
+    char *server_path = sc_get_env("SCRPLAY_SERVER_PATH");
     if (server_path) {
         // if the envvar is set, use it
-        LOGD("Using SCRCPY_SERVER_PATH: %s", server_path);
+        LOGD("Using SCRPLAY_SERVER_PATH: %s", server_path);
         return server_path;
     }
 
@@ -245,8 +250,9 @@ execute_server(struct sc_server *server,
 #endif
 
     cmd[count++] = "/"; // unused
+    // legacy class name: must match the prebuilt upstream server jar exactly
     cmd[count++] = "com.genymobile.scrcpy.Server";
-    cmd[count++] = SCRCPY_VERSION;
+    cmd[count++] = SCRPLAY_VERSION;
 
     unsigned dyn_idx = count; // from there, the strings are allocated
 #define ADD_PARAM(fmt, ...) do { \
@@ -961,7 +967,7 @@ run_server(void *data) {
 
     // A device must be selected via a serial in all cases except when --tcpip=
     // is called with a parameter (in that case, the device may initially not
-    // exist, and scrcpy will execute "adb connect").
+    // exist, and scrplay will execute "adb connect").
     bool need_initial_serial = !params->tcpip_dst;
 
     if (need_initial_serial) {
@@ -1155,7 +1161,7 @@ error_connection_failed:
 bool
 sc_server_start(struct sc_server *server) {
     bool ok =
-        sc_thread_create(&server->thread, run_server, "scrcpy-server", server);
+        sc_thread_create(&server->thread, run_server, "scrplay-server", server);
     if (!ok) {
         LOGE("Could not create server thread");
         return false;

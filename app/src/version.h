@@ -4,6 +4,6 @@
 #include "common.h"
 
 void
-scrcpy_print_version(void);
+scrplay_print_version(void);
 
 #endif

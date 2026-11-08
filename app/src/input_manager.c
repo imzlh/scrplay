@@ -32,12 +32,24 @@ sc_input_manager_init(struct sc_input_manager *im,
     im->mouse_bindings = params->mouse_bindings;
     im->legacy_paste = params->legacy_paste;
     im->clipboard_autosync = params->clipboard_autosync;
+    im->game_mode = params->game_mode;
 
     im->sdl_shortcut_mods = sc_shortcut_mods_to_sdl(params->shortcut_mods);
 
     im->vfinger_down = false;
     im->vfinger_invert_x = false;
     im->vfinger_invert_y = false;
+    im->vfinger_position = (struct sc_point) {0, 0};
+    im->absolute_mouse_buttons = 0;
+    im->absolute_mouse_position = (struct sc_position) {0};
+    for (size_t i = 0; i < ARRAY_LEN(im->touches); ++i) {
+        im->touches[i].active = false;
+    }
+
+    for (size_t i = 0; i < ARRAY_LEN(im->active_mouse_bindings); ++i) {
+        im->active_mouse_bindings[i] = SC_MOUSE_BINDING_AUTO;
+        im->released_mouse_bindings[i] = false;
+    }
 
     im->mouse_buttons_state = 0;
 
@@ -317,8 +329,9 @@ sc_input_manager_process_text_input(struct sc_input_manager *im,
         return;
     }
 
-    if (sc_shortcut_mods_is_shortcut_mod(im->sdl_shortcut_mods,
-                                         SDL_GetModState())) {
+    if (!im->game_mode
+            && sc_shortcut_mods_is_shortcut_mod(im->sdl_shortcut_mods,
+                                                SDL_GetModState())) {
         // A shortcut must never generate text events
         return;
     }
@@ -357,12 +370,18 @@ simulate_virtual_finger(struct sc_input_manager *im,
 static struct sc_point
 inverse_point(struct sc_point point, struct sc_size size,
               bool invert_x, bool invert_y) {
+    int32_t max_x = size.width ? size.width - 1 : 0;
+    int32_t max_y = size.height ? size.height - 1 : 0;
+    point.x = CLAMP(point.x, 0, max_x);
+    point.y = CLAMP(point.y, 0, max_y);
     if (invert_x) {
-        point.x = size.width - point.x;
+        point.x = max_x - point.x;
     }
     if (invert_y) {
-        point.y = size.height - point.y;
+        point.y = max_y - point.y;
     }
+    point.x = CLAMP(point.x, 0, max_x);
+    point.y = CLAMP(point.y, 0, max_y);
     return point;
 }
 
@@ -386,8 +405,14 @@ sc_input_manager_process_key(struct sc_input_manager *im,
     // The second condition is necessary to ignore the release of the modifier
     // key (because in this case mod is 0).
     uint16_t mods = im->sdl_shortcut_mods;
-    bool is_shortcut = sc_shortcut_mods_is_shortcut_mod(mods, mod)
-                    || sc_shortcut_mods_is_shortcut_key(mods, sdl_keycode);
+    // The game wrapper must see every key (including Alt/Super/Ctrl combos)
+    // before deciding whether it is a mapping, a game hotkey, or an ordinary
+    // device key. Upstream scrplay shortcuts would otherwise consume these
+    // events here and the game key processor would never receive them.
+    bool is_shortcut = !im->game_mode
+                    && (sc_shortcut_mods_is_shortcut_mod(mods, mod)
+                        || sc_shortcut_mods_is_shortcut_key(mods,
+                                                            sdl_keycode));
 
     if (down && !repeat) {
         if (sdl_keycode == im->last_keycode && mod == im->last_mod) {
@@ -563,7 +588,10 @@ sc_input_manager_process_key(struct sc_input_manager *im,
 
     uint64_t ack_to_wait = SC_SEQUENCE_INVALID;
     bool is_ctrl_v = ctrl && !shift && sdl_keycode == SDLK_v && down && !repeat;
-    if (im->clipboard_autosync && is_ctrl_v) {
+    // In game mode Ctrl is reserved for temporarily releasing the mouse and
+    // is also usable in mapped combinations. Clipboard synchronization must
+    // not steal Ctrl+V before the game processor sees it.
+    if (!im->game_mode && im->clipboard_autosync && is_ctrl_v) {
         if (im->legacy_paste) {
             // inject the text as input events
             clipboard_paste(im);
@@ -612,21 +640,19 @@ sc_input_manager_process_key(struct sc_input_manager *im,
     im->kp->ops->process_key(im->kp, &evt, ack_to_wait);
 }
 
-static struct sc_position
+static bool
 sc_input_manager_get_position(struct sc_input_manager *im, int32_t x,
-                                                           int32_t y) {
+                              int32_t y, struct sc_position *position) {
     if (im->mp->relative_mode) {
         // No absolute position
-        return (struct sc_position) {
+        *position = (struct sc_position) {
             .screen_size = {0, 0},
             .point = {0, 0},
         };
+        return true;
     }
 
-    return (struct sc_position) {
-        .screen_size = im->screen->frame_size,
-        .point = sc_screen_convert_window_to_frame_coords(im->screen, x, y),
-    };
+    return sc_screen_window_to_frame_position(im->screen, x, y, position);
 }
 
 static void
@@ -637,8 +663,18 @@ sc_input_manager_process_mouse_motion(struct sc_input_manager *im,
         return;
     }
 
+    struct sc_position position;
+    bool relative = im->mp->relative_mode;
+    if (!sc_input_manager_get_position(im, event->x, event->y, &position)) {
+        // Never inject an absolute hover/drag MOVE from a black border.
+        return;
+    }
+    if (!relative) {
+        im->absolute_mouse_position = position;
+    }
+
     struct sc_mouse_motion_event evt = {
-        .position = sc_input_manager_get_position(im, event->x, event->y),
+        .position = position,
         .pointer_id = im->vfinger_down ? SC_POINTER_ID_GENERIC_FINGER
                                        : SC_POINTER_ID_MOUSE,
         .xrel = event->xrel,
@@ -654,14 +690,35 @@ sc_input_manager_process_mouse_motion(struct sc_input_manager *im,
 
     if (im->vfinger_down) {
         assert(!im->mp->relative_mode); // assert one more time
-        struct sc_point mouse =
-           sc_screen_convert_window_to_frame_coords(im->screen, event->x,
-                                                    event->y);
-        struct sc_point vfinger = inverse_point(mouse, im->screen->frame_size,
+        struct sc_point vfinger = inverse_point(position.point,
+                                                im->screen->frame_size,
                                                 im->vfinger_invert_x,
                                                 im->vfinger_invert_y);
-        simulate_virtual_finger(im, AMOTION_EVENT_ACTION_MOVE, vfinger);
+        if (simulate_virtual_finger(im, AMOTION_EVENT_ACTION_MOVE, vfinger)) {
+            im->vfinger_position = vfinger;
+        }
     }
+}
+
+static int
+sc_input_manager_find_touch(const struct sc_input_manager *im,
+                            SDL_FingerID id) {
+    for (size_t i = 0; i < ARRAY_LEN(im->touches); ++i) {
+        if (im->touches[i].active && im->touches[i].id == id) {
+            return (int) i;
+        }
+    }
+    return -1;
+}
+
+static int
+sc_input_manager_find_free_touch(const struct sc_input_manager *im) {
+    for (size_t i = 0; i < ARRAY_LEN(im->touches); ++i) {
+        if (!im->touches[i].active) {
+            return (int) i;
+        }
+    }
+    return -1;
 }
 
 static void
@@ -672,26 +729,56 @@ sc_input_manager_process_touch(struct sc_input_manager *im,
         return;
     }
 
-    int dw;
-    int dh;
-    SDL_GL_GetDrawableSize(im->screen->window, &dw, &dh);
-
     // SDL touch event coordinates are normalized in the range [0; 1]
-    int32_t x = event->x * dw;
-    int32_t y = event->y * dh;
+    int ww;
+    int wh;
+    SDL_GetWindowSize(im->screen->window, &ww, &wh);
+    int32_t x = event->x * ww;
+    int32_t y = event->y * wh;
+
+    struct sc_position position;
+    bool position_valid =
+        sc_screen_window_to_frame_position(im->screen, x, y, &position);
+    int slot = sc_input_manager_find_touch(im, event->fingerId);
+    enum sc_touch_action action = sc_touch_action_from_sdl(event->type);
+
+    if (action == SC_TOUCH_ACTION_DOWN) {
+        if (!position_valid || slot != -1) {
+            return;
+        }
+        slot = sc_input_manager_find_free_touch(im);
+        if (slot == -1) {
+            return;
+        }
+        im->touches[slot].active = true;
+        im->touches[slot].id = event->fingerId;
+        im->touches[slot].position = position;
+    } else {
+        // MOVE/UP only belong to a DOWN which was injected inside the video.
+        if (slot == -1) {
+            return;
+        }
+        if (position_valid) {
+            im->touches[slot].position = position;
+        } else if (action == SC_TOUCH_ACTION_MOVE) {
+            return;
+        } else {
+            // Preserve the last valid position for an UP outside the video.
+            position = im->touches[slot].position;
+        }
+    }
 
     struct sc_touch_event evt = {
-        .position = {
-            .screen_size = im->screen->frame_size,
-            .point =
-                sc_screen_convert_drawable_to_frame_coords(im->screen, x, y),
-        },
-        .action = sc_touch_action_from_sdl(event->type),
+        .position = position,
+        .action = action,
         .pointer_id = event->fingerId,
         .pressure = event->pressure,
     };
 
     im->mp->ops->process_touch(im->mp, &evt);
+    if (action == SC_TOUCH_ACTION_UP) {
+        im->touches[slot].active = false;
+    }
 }
 
 static enum sc_mouse_binding
@@ -714,6 +801,44 @@ sc_input_manager_get_binding(const struct sc_mouse_binding_set *bindings,
 }
 
 static void
+sc_input_manager_apply_mouse_binding(struct sc_input_manager *im,
+                                     enum sc_mouse_binding binding,
+                                     enum sc_action action, uint8_t clicks) {
+    switch (binding) {
+        case SC_MOUSE_BINDING_DISABLED:
+            break;
+        case SC_MOUSE_BINDING_BACK:
+            if (im->kp) {
+                press_back_or_turn_screen_on(im, action);
+            }
+            break;
+        case SC_MOUSE_BINDING_HOME:
+            if (im->kp) {
+                action_home(im, action);
+            }
+            break;
+        case SC_MOUSE_BINDING_APP_SWITCH:
+            if (im->kp) {
+                action_app_switch(im, action);
+            }
+            break;
+        case SC_MOUSE_BINDING_EXPAND_NOTIFICATION_PANEL:
+            if (action == SC_ACTION_DOWN) {
+                if (clicks < 2) {
+                    expand_notification_panel(im);
+                } else {
+                    expand_settings_panel(im);
+                }
+            }
+            break;
+        case SC_MOUSE_BINDING_AUTO:
+        case SC_MOUSE_BINDING_CLICK:
+            assert(false);
+            break;
+    }
+}
+
+static void
 sc_input_manager_process_mouse_button(struct sc_input_manager *im,
                                       const SDL_MouseButtonEvent *event) {
     if (event->which == SDL_TOUCH_MOUSEID) {
@@ -730,6 +855,30 @@ sc_input_manager_process_mouse_button(struct sc_input_manager *im,
         return;
     }
 
+    assert(event->button <= SDL_BUTTON_X2);
+
+    // A special native binding owns its matching UP even if F8 changed the
+    // control mode while the physical button was held.
+    enum sc_mouse_binding owned =
+        im->active_mouse_bindings[event->button];
+    if (!down && owned != SC_MOUSE_BINDING_AUTO) {
+        bool already_released = im->released_mouse_bindings[event->button];
+        im->active_mouse_bindings[event->button] = SC_MOUSE_BINDING_AUTO;
+        im->released_mouse_bindings[event->button] = false;
+        if (!already_released) {
+            sc_input_manager_apply_mouse_binding(im, owned, SC_ACTION_UP,
+                                                 event->clicks);
+        }
+        return;
+    }
+    if (down && owned != SC_MOUSE_BINDING_AUTO) {
+        // A new physical DOWN proves that the old UP was lost (typically on
+        // focus loss). Discard the stale ownership before resolving this
+        // press under the current control mode.
+        im->active_mouse_bindings[event->button] = SC_MOUSE_BINDING_AUTO;
+        im->released_mouse_bindings[event->button] = false;
+    }
+
     if (!down) {
         // Mark the button as released
         im->mouse_buttons_state &= ~button;
@@ -739,46 +888,19 @@ sc_input_manager_process_mouse_button(struct sc_input_manager *im,
     bool ctrl_pressed = keymod & KMOD_CTRL;
     bool shift_pressed = keymod & KMOD_SHIFT;
 
-    if (control && !paused) {
-        enum sc_action action = down ? SC_ACTION_DOWN : SC_ACTION_UP;
-
+    if (!im->game_mode && down && control && !paused) {
         struct sc_mouse_binding_set *bindings = !shift_pressed
                                               ? &im->mouse_bindings.pri
                                               : &im->mouse_bindings.sec;
         enum sc_mouse_binding binding =
             sc_input_manager_get_binding(bindings, event->button);
         assert(binding != SC_MOUSE_BINDING_AUTO);
-        switch (binding) {
-            case SC_MOUSE_BINDING_DISABLED:
-                // ignore click
-                return;
-            case SC_MOUSE_BINDING_BACK:
-                if (im->kp) {
-                    press_back_or_turn_screen_on(im, action);
-                }
-                return;
-            case SC_MOUSE_BINDING_HOME:
-                if (im->kp) {
-                    action_home(im, action);
-                }
-                return;
-            case SC_MOUSE_BINDING_APP_SWITCH:
-                if (im->kp) {
-                    action_app_switch(im, action);
-                }
-                return;
-            case SC_MOUSE_BINDING_EXPAND_NOTIFICATION_PANEL:
-                if (down) {
-                    if (event->clicks < 2) {
-                        expand_notification_panel(im);
-                    } else {
-                        expand_settings_panel(im);
-                    }
-                }
-                return;
-            default:
-                assert(binding == SC_MOUSE_BINDING_CLICK);
-                break;
+        if (binding != SC_MOUSE_BINDING_CLICK) {
+            im->active_mouse_bindings[event->button] = binding;
+            im->released_mouse_bindings[event->button] = false;
+            sc_input_manager_apply_mouse_binding(im, binding, SC_ACTION_DOWN,
+                                                 event->clicks);
+            return;
         }
     }
 
@@ -805,9 +927,55 @@ sc_input_manager_process_mouse_button(struct sc_input_manager *im,
         return;
     }
 
+    struct sc_position position;
+    if (im->mp->relative_mode) {
+        // Relative processors do not use the absolute position. Preserve the
+        // original mapped-game/captured-mouse path byte-for-byte in spirit:
+        // physical button state is updated and the event is always forwarded.
+        if (down) {
+            im->mouse_buttons_state |= button;
+        }
+        bool ok = sc_input_manager_get_position(im, event->x, event->y,
+                                                &position);
+        assert(ok);
+
+        struct sc_mouse_click_event evt = {
+            .position = position,
+            .action = sc_action_from_sdl_mousebutton_type(event->type),
+            .button = button,
+            .pointer_id = SC_POINTER_ID_MOUSE,
+            .buttons_state = im->mouse_buttons_state,
+        };
+
+        assert(im->mp->ops->process_mouse_click);
+        im->mp->ops->process_mouse_click(im->mp, &evt);
+        assert(!im->vfinger_down);
+        return;
+    }
+
+    bool absolute_owned = im->absolute_mouse_buttons & button;
+    bool position_valid = sc_input_manager_get_position(
+        im, event->x, event->y, &position);
     if (down) {
-        // Mark the button as pressed
+        // A DOWN on a black border does not start an Android pointer stream.
+        if (!position_valid) {
+            return;
+        }
+        im->absolute_mouse_buttons |= button;
         im->mouse_buttons_state |= button;
+        im->absolute_mouse_position = position;
+    } else {
+        // Only an injected DOWN owns an UP. If the pointer left the visible
+        // video, close it at the last valid position instead of dropping it.
+        if (!absolute_owned) {
+            return;
+        }
+        im->absolute_mouse_buttons &= ~button;
+        if (position_valid) {
+            im->absolute_mouse_position = position;
+        } else {
+            position = im->absolute_mouse_position;
+        }
     }
 
     bool change_vfinger = event->button == SDL_BUTTON_LEFT &&
@@ -816,7 +984,7 @@ sc_input_manager_process_mouse_button(struct sc_input_manager *im,
     bool use_finger = im->vfinger_down || change_vfinger;
 
     struct sc_mouse_click_event evt = {
-        .position = sc_input_manager_get_position(im, event->x, event->y),
+        .position = position,
         .action = sc_action_from_sdl_mousebutton_type(event->type),
         .button = button,
         .pointer_id = use_finger ? SC_POINTER_ID_GENERIC_FINGER
@@ -826,12 +994,6 @@ sc_input_manager_process_mouse_button(struct sc_input_manager *im,
 
     assert(im->mp->ops->process_mouse_click);
     im->mp->ops->process_mouse_click(im->mp, &evt);
-
-    if (im->mp->relative_mode) {
-        assert(!im->vfinger_down); // vfinger must not be used in relative mode
-        // No pinch-to-zoom simulation
-        return;
-    }
 
     // Pinch-to-zoom, rotate and tilt simulation.
     //
@@ -854,9 +1016,6 @@ sc_input_manager_process_mouse_button(struct sc_input_manager *im,
     // of the screen. It is expected to be less frequently used, that's why the
     // one-mod shortcuts are assigned to rotation and vertical tilt.
     if (change_vfinger) {
-        struct sc_point mouse =
-            sc_screen_convert_window_to_frame_coords(im->screen, event->x,
-                                                                 event->y);
         if (down) {
             // Ctrl  Shift     invert_x  invert_y
             // ----  ----- ==> --------  --------
@@ -867,17 +1026,56 @@ sc_input_manager_process_mouse_button(struct sc_input_manager *im,
             im->vfinger_invert_x = ctrl_pressed ^ shift_pressed;
             im->vfinger_invert_y = ctrl_pressed;
         }
-        struct sc_point vfinger = inverse_point(mouse, im->screen->frame_size,
-                                                im->vfinger_invert_x,
-                                                im->vfinger_invert_y);
+        struct sc_point vfinger = down
+            ? inverse_point(position.point, im->screen->frame_size,
+                            im->vfinger_invert_x, im->vfinger_invert_y)
+            : im->vfinger_position;
         enum android_motionevent_action action = down
                                                ? AMOTION_EVENT_ACTION_DOWN
                                                : AMOTION_EVENT_ACTION_UP;
         if (!simulate_virtual_finger(im, action, vfinger)) {
             return;
         }
+        im->vfinger_position = vfinger;
         im->vfinger_down = down;
     }
+}
+
+void
+sc_input_manager_set_game_mode(struct sc_input_manager *im, bool game_mode) {
+    im->game_mode = game_mode;
+}
+
+void
+sc_input_manager_release_all(struct sc_input_manager *im) {
+    if (im->vfinger_down) {
+        simulate_virtual_finger(im, AMOTION_EVENT_ACTION_UP,
+                                im->vfinger_position);
+        im->vfinger_down = false;
+    }
+    im->vfinger_invert_x = false;
+    im->vfinger_invert_y = false;
+    im->vfinger_position = (struct sc_point) {0, 0};
+
+    // Physical UPs may still arrive after a mode transition. Do not discard
+    // absolute ownership here: it is needed to close those injected DOWNs at
+    // their last valid position. mouse_buttons_state is rebuilt by events.
+
+    for (size_t i = 0; i < ARRAY_LEN(im->active_mouse_bindings); ++i) {
+        enum sc_mouse_binding binding = im->active_mouse_bindings[i];
+        if (binding != SC_MOUSE_BINDING_AUTO) {
+            if (!im->released_mouse_bindings[i]) {
+                sc_input_manager_apply_mouse_binding(im, binding,
+                                                     SC_ACTION_UP, 0);
+                im->released_mouse_bindings[i] = true;
+            }
+        }
+    }
+
+    im->mouse_buttons_state = 0;
+    im->last_keycode = SDLK_UNKNOWN;
+    im->last_mod = 0;
+    im->key_repeat = 0;
 }
 
 static void
@@ -894,8 +1092,17 @@ sc_input_manager_process_mouse_wheel(struct sc_input_manager *im,
     uint32_t buttons = SDL_GetMouseState(&mouse_x, &mouse_y);
     (void) buttons; // Actual buttons are tracked manually to ignore shortcuts
 
+    struct sc_position position;
+    if (!sc_input_manager_get_position(im, mouse_x, mouse_y, &position)) {
+        // Never inject a wheel event from a black border.
+        return;
+    }
+    if (!im->mp->relative_mode) {
+        im->absolute_mouse_position = position;
+    }
+
     struct sc_mouse_scroll_event evt = {
-        .position = sc_input_manager_get_position(im, mouse_x, mouse_y),
+        .position = position,
 #if SDL_VERSION_ATLEAST(2, 0, 18)
         .hscroll = event->preciseX,
         .vscroll = event->preciseY,

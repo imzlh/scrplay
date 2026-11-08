@@ -18,16 +18,16 @@
 #define DOWNCAST_AUDIO(SINK) \
     container_of(SINK, struct sc_recorder, audio_packet_sink)
 
-static const AVRational SCRCPY_TIME_BASE = {1, 1000000}; // timestamps in us
+static const AVRational SCRPLAY_TIME_BASE = {1, 1000000}; // timestamps in us
 
 static const AVOutputFormat *
 find_muxer(const char *name) {
-#ifdef SCRCPY_LAVF_HAS_NEW_MUXER_ITERATOR_API
+#ifdef SCRPLAY_LAVF_HAS_NEW_MUXER_ITERATOR_API
     void *opaque = NULL;
 #endif
     const AVOutputFormat *oformat = NULL;
     do {
-#ifdef SCRCPY_LAVF_HAS_NEW_MUXER_ITERATOR_API
+#ifdef SCRPLAY_LAVF_HAS_NEW_MUXER_ITERATOR_API
         oformat = av_muxer_iterate(&opaque);
 #else
         oformat = av_oformat_next(oformat);
@@ -100,7 +100,7 @@ sc_recorder_set_extradata(AVStream *ostream, const AVPacket *packet) {
 
 static inline void
 sc_recorder_rescale_packet(AVStream *stream, AVPacket *packet) {
-    av_packet_rescale_ts(packet, SCRCPY_TIME_BASE, stream->time_base);
+    av_packet_rescale_ts(packet, SCRPLAY_TIME_BASE, stream->time_base);
 }
 
 static bool
@@ -167,7 +167,7 @@ sc_recorder_open_output_file(struct sc_recorder *recorder) {
     recorder->ctx->oformat = (AVOutputFormat *) format;
 
     av_dict_set(&recorder->ctx->metadata, "comment",
-                "Recorded by scrcpy " SCRCPY_VERSION, 0);
+                "Recorded by scrplay " SCRPLAY_VERSION, 0);
 
     LOGI("Recording started to %s file: %s", format_name, recorder->filename);
     return true;
@@ -508,7 +508,7 @@ sc_recorder_set_orientation(AVStream *stream, enum sc_orientation orientation) {
     assert(!sc_orientation_is_mirror(orientation));
 
     uint8_t *raw_data;
-#ifdef SCRCPY_LAVC_HAS_CODECPAR_CODEC_SIDEDATA
+#ifdef SCRPLAY_LAVC_HAS_CODECPAR_CODEC_SIDEDATA
     AVPacketSideData *sd =
         av_packet_side_data_new(&stream->codecpar->coded_side_data,
                                 &stream->codecpar->nb_coded_side_data,
@@ -823,7 +823,7 @@ error_free_filename:
 bool
 sc_recorder_start(struct sc_recorder *recorder) {
     bool ok = sc_thread_create(&recorder->thread, run_recorder,
-                               "scrcpy-recorder", recorder);
+                               "scrplay-recorder", recorder);
     if (!ok) {
         LOGE("Could not start recorder thread");
         return false;

@@ -10,8 +10,8 @@
 
 #include "cli.h"
 #include "options.h"
-#include "scrcpy.h"
-#include "usb/scrcpy_otg.h"
+#include "scrplay.h"
+#include "usb/scrplay_otg.h"
 #include "util/log.h"
 #include "util/net.h"
 #include "util/thread.h"
@@ -23,7 +23,7 @@
 #endif
 
 static int
-main_scrcpy(int argc, char *argv[]) {
+main_scrplay(int argc, char *argv[]) {
 #ifdef _WIN32
     // disable buffering, we want logs immediately
     // even line buffering (setvbuf() with mode _IOLBF) is not sufficient
@@ -31,11 +31,11 @@ main_scrcpy(int argc, char *argv[]) {
     setbuf(stderr, NULL);
 #endif
 
-    printf("scrcpy " SCRCPY_VERSION
-           " <https://github.com/Genymobile/scrcpy>\n");
+    printf("scrplay " SCRPLAY_VERSION
+           " <https://github.com/imzlh/scrplay>\n");
 
-    struct scrcpy_cli_args args = {
-        .opts = scrcpy_options_default,
+    struct scrplay_cli_args args = {
+        .opts = scrplay_options_default,
         .help = false,
         .version = false,
         .pause_on_exit = SC_PAUSE_ON_EXIT_FALSE,
@@ -45,31 +45,31 @@ main_scrcpy(int argc, char *argv[]) {
     args.opts.log_level = SC_LOG_LEVEL_DEBUG;
 #endif
 
-    enum scrcpy_exit_code ret;
+    enum scrplay_exit_code ret;
 
-    if (!scrcpy_parse_args(&args, argc, argv)) {
-        ret = SCRCPY_EXIT_FAILURE;
+    if (!scrplay_parse_args(&args, argc, argv)) {
+        ret = SCRPLAY_EXIT_FAILURE;
         goto end;
     }
 
     sc_set_log_level(args.opts.log_level);
 
     if (args.help) {
-        scrcpy_print_usage(argv[0]);
-        ret = SCRCPY_EXIT_SUCCESS;
+        scrplay_print_usage(argv[0]);
+        ret = SCRPLAY_EXIT_SUCCESS;
         goto end;
     }
 
     if (args.version) {
-        scrcpy_print_version();
-        ret = SCRCPY_EXIT_SUCCESS;
+        scrplay_print_version();
+        ret = SCRPLAY_EXIT_SUCCESS;
         goto end;
     }
 
     // The current thread is the main thread
     SC_MAIN_THREAD_ID = sc_thread_get_id();
 
-#ifdef SCRCPY_LAVF_REQUIRES_REGISTER_ALL
+#ifdef SCRPLAY_LAVF_REQUIRES_REGISTER_ALL
     av_register_all();
 #endif
 
@@ -80,22 +80,22 @@ main_scrcpy(int argc, char *argv[]) {
 #endif
 
     if (!net_init()) {
-        ret = SCRCPY_EXIT_FAILURE;
+        ret = SCRPLAY_EXIT_FAILURE;
         goto end;
     }
 
     sc_log_configure();
 
 #ifdef HAVE_USB
-    ret = args.opts.otg ? scrcpy_otg(&args.opts) : scrcpy(&args.opts);
+    ret = args.opts.otg ? scrplay_otg(&args.opts) : scrplay(&args.opts);
 #else
-    ret = scrcpy(&args.opts);
+    ret = scrplay(&args.opts);
 #endif
 
 end:
     if (args.pause_on_exit == SC_PAUSE_ON_EXIT_TRUE ||
             (args.pause_on_exit == SC_PAUSE_ON_EXIT_IF_ERROR &&
-                ret != SCRCPY_EXIT_SUCCESS)) {
+                ret != SCRPLAY_EXIT_SUCCESS)) {
         printf("Press Enter to continue...\n");
         getchar();
     }
@@ -106,7 +106,7 @@ end:
 int
 main(int argc, char *argv[]) {
 #ifndef _WIN32
-    return main_scrcpy(argc, argv);
+    return main_scrplay(argc, argv);
 #else
     (void) argc;
     (void) argv;
@@ -114,14 +114,14 @@ main(int argc, char *argv[]) {
     wchar_t **wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
     if (!wargv) {
         LOG_OOM();
-        return SCRCPY_EXIT_FAILURE;
+        return SCRPLAY_EXIT_FAILURE;
     }
 
     char **argv_utf8 = malloc((wargc + 1) * sizeof(*argv_utf8));
     if (!argv_utf8) {
         LOG_OOM();
         LocalFree(wargv);
-        return SCRCPY_EXIT_FAILURE;
+        return SCRPLAY_EXIT_FAILURE;
     }
 
     argv_utf8[wargc] = NULL;
@@ -135,13 +135,13 @@ main(int argc, char *argv[]) {
             }
             LocalFree(wargv);
             free(argv_utf8);
-            return SCRCPY_EXIT_FAILURE;
+            return SCRPLAY_EXIT_FAILURE;
         }
     }
 
     LocalFree(wargv);
 
-    int ret = main_scrcpy(wargc, argv_utf8);
+    int ret = main_scrplay(wargc, argv_utf8);
 
     for (int i = 0; i < wargc; ++i) {
         free(argv_utf8[i]);

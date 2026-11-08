@@ -36,6 +36,11 @@ struct sc_display {
     } pending;
 
     bool has_frame;
+
+    // Optional overlay callback (used by game mode): called after the video
+    // frame has been drawn, just before SDL_RenderPresent.
+    void (*overlay_callback)(SDL_Renderer *renderer, void *userdata);
+    void *overlay_userdata;
 };
 
 enum sc_display_result {
@@ -57,8 +62,18 @@ sc_display_set_texture_size(struct sc_display *display, struct sc_size size);
 enum sc_display_result
 sc_display_update_texture(struct sc_display *display, const AVFrame *frame);
 
+// Render source (NULL means the whole texture) into geometry, applying the
+// client orientation. Pixels outside geometry are cleared to opaque black.
 enum sc_display_result
-sc_display_render(struct sc_display *display, const SDL_Rect *geometry,
-                  enum sc_orientation orientation);
+sc_display_render(struct sc_display *display, const SDL_Rect *source,
+                  const SDL_Rect *geometry, enum sc_orientation orientation);
+
+// Register an overlay callback, invoked after the frame is drawn and before
+// SDL_RenderPresent on every render pass.
+void
+sc_display_set_overlay_callback(struct sc_display *display,
+                                void (*callback)(SDL_Renderer *renderer,
+                                                 void *userdata),
+                                void *userdata);
 
 #endif

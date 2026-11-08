@@ -136,7 +136,7 @@ sc_delay_buffer_frame_sink_open(struct sc_frame_sink *sink,
         goto error_destroy_wait_cond;
     }
 
-    ok = sc_thread_create(&db->thread, run_buffering, "scrcpy-dbuf", db);
+    ok = sc_thread_create(&db->thread, run_buffering, "scrplay-dbuf", db);
     if (!ok) {
         LOGE("Could not start buffering thread");
         goto error_close_sinks;

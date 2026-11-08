@@ -1,6 +1,7 @@
 #include "screen.h"
 
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 #include <SDL2/SDL.h>
 
@@ -13,6 +14,10 @@
 
 #define DOWNCAST(SINK) container_of(SINK, struct sc_screen, frame_sink)
 
+static bool
+sc_screen_get_coords(struct sc_screen *screen,
+                     struct sc_screen_coords *coords);
+
 static inline struct sc_size
 get_oriented_size(struct sc_size size, enum sc_orientation orientation) {
     struct sc_size oriented_size;
@@ -24,6 +29,52 @@ get_oriented_size(struct sc_size size, enum sc_orientation orientation) {
         oriented_size.height = size.height;
     }
     return oriented_size;
+}
+
+static int
+clamp_int(int value, int min, int max) {
+    return value < min ? min : value > max ? max : value;
+}
+
+static void
+sc_screen_resolve_crop(struct sc_screen *screen) {
+    int width = screen->frame_size.width;
+    int height = screen->frame_size.height;
+    if (width <= 0 || height <= 0) {
+        screen->crop.source = (SDL_Rect) {0, 0, 0, 0};
+        return;
+    }
+
+    if (!screen->crop.enabled) {
+        screen->crop.source = (SDL_Rect) {0, 0, width, height};
+        return;
+    }
+
+    int left = (int) lroundf(screen->crop.left * width);
+    int top = (int) lroundf(screen->crop.top * height);
+    int right = (int) lroundf(screen->crop.right * width);
+    int bottom = (int) lroundf(screen->crop.bottom * height);
+    left = clamp_int(left, 0, width - 1);
+    top = clamp_int(top, 0, height - 1);
+    right = clamp_int(right, left + 1, width);
+    bottom = clamp_int(bottom, top + 1, height);
+    screen->crop.source = (SDL_Rect) {
+        .x = left,
+        .y = top,
+        .w = right - left,
+        .h = bottom - top,
+    };
+}
+
+static struct sc_size
+sc_screen_get_raw_content_size(const struct sc_screen *screen) {
+    if (screen->crop.preview) {
+        return screen->frame_size;
+    }
+    return (struct sc_size) {
+        .width = screen->crop.source.w,
+        .height = screen->crop.source.h,
+    };
 }
 
 // get the window size in a struct sc_size
@@ -168,7 +219,10 @@ sc_screen_update_content_rect(struct sc_screen *screen) {
 
     int dw;
     int dh;
-    SDL_GL_GetDrawableSize(screen->window, &dw, &dh);
+    if (SDL_GetRendererOutputSize(screen->display.renderer, &dw, &dh)) {
+        LOGE("Could not get renderer output size: %s", SDL_GetError());
+        return;
+    }
 
     struct sc_size content_size = screen->content_size;
     // The drawable size is the window size * the HiDPI scale
@@ -213,15 +267,28 @@ sc_screen_render(struct sc_screen *screen, bool update_content_rect) {
         sc_screen_update_content_rect(screen);
     }
 
-    enum sc_display_result res =
-        sc_display_render(&screen->display, &screen->rect, screen->orientation);
+    const SDL_Rect *source = NULL;
+    bool full_source = screen->crop.source.x == 0
+                    && screen->crop.source.y == 0
+                    && screen->crop.source.w == screen->frame_size.width
+                    && screen->crop.source.h == screen->frame_size.height;
+    // Cropping is applied only after the album-style editor closes. While it
+    // is open, the complete picture must remain available so an edge that was
+    // moved inward can still be found and dragged back outward. The UI draws
+    // an editor scrim over the area that will be discarded.
+    if (!screen->crop.preview && !full_source) {
+        source = &screen->crop.source;
+    }
+
+    enum sc_display_result res = sc_display_render(
+        &screen->display, source, &screen->rect, screen->orientation);
     (void) res; // any error already logged
 }
 
 static void
 sc_screen_render_novideo(struct sc_screen *screen) {
     enum sc_display_result res =
-        sc_display_render(&screen->display, NULL, SC_ORIENTATION_0);
+        sc_display_render(&screen->display, NULL, NULL, SC_ORIENTATION_0);
     (void) res; // any error already logged
 }
 
@@ -333,6 +400,13 @@ sc_screen_init(struct sc_screen *screen,
     screen->paused = false;
     screen->resume_frame = NULL;
     screen->orientation = SC_ORIENTATION_0;
+    screen->crop.enabled = false;
+    screen->crop.preview = false;
+    screen->crop.left = 0.0f;
+    screen->crop.top = 0.0f;
+    screen->crop.right = 1.0f;
+    screen->crop.bottom = 1.0f;
+    screen->crop.source = (SDL_Rect) {0, 0, 0, 0};
 
     screen->video = params->video;
 
@@ -400,7 +474,7 @@ sc_screen_init(struct sc_screen *screen,
         goto error_destroy_fps_counter;
     }
 
-    SDL_Surface *icon = scrcpy_icon_load();
+    SDL_Surface *icon = scrplay_icon_load();
     if (icon) {
         SDL_SetWindowIcon(screen->window, icon);
     } else if (params->video) {
@@ -417,7 +491,7 @@ sc_screen_init(struct sc_screen *screen,
     ok = sc_display_init(&screen->display, screen->window, icon_novideo,
                          mipmaps);
     if (icon) {
-        scrcpy_icon_destroy(icon);
+        scrplay_icon_destroy(icon);
     }
     if (!ok) {
         goto error_destroy_window;
@@ -439,6 +513,7 @@ sc_screen_init(struct sc_screen *screen,
         .mouse_bindings = params->mouse_bindings,
         .legacy_paste = params->legacy_paste,
         .clipboard_autosync = params->clipboard_autosync,
+        .game_mode = params->game_mode,
         .shortcut_mods = params->shortcut_mods,
     };
 
@@ -592,8 +667,9 @@ sc_screen_set_orientation(struct sc_screen *screen,
         return;
     }
 
+    struct sc_size raw_content_size = sc_screen_get_raw_content_size(screen);
     struct sc_size new_content_size =
-        get_oriented_size(screen->frame_size, orientation);
+        get_oriented_size(raw_content_size, orientation);
 
     set_content_size(screen, new_content_size);
 
@@ -603,6 +679,39 @@ sc_screen_set_orientation(struct sc_screen *screen,
     sc_screen_render(screen, true);
 }
 
+void
+sc_screen_set_crop(struct sc_screen *screen, bool enabled, float left,
+                   float top, float right, float bottom, bool preview) {
+    assert(screen->video);
+    assert(isfinite(left) && isfinite(top)
+        && isfinite(right) && isfinite(bottom));
+    assert(left >= 0.0f && top >= 0.0f
+        && right <= 1.0f && bottom <= 1.0f
+        && left < right && top < bottom);
+
+    screen->crop.enabled = enabled;
+    screen->crop.preview = preview;
+    screen->crop.left = enabled ? left : 0.0f;
+    screen->crop.top = enabled ? top : 0.0f;
+    screen->crop.right = enabled ? right : 1.0f;
+    screen->crop.bottom = enabled ? bottom : 1.0f;
+    sc_screen_resolve_crop(screen);
+
+    if (!screen->frame_size.width || !screen->frame_size.height) {
+        return;
+    }
+    struct sc_size raw_content_size = sc_screen_get_raw_content_size(screen);
+    screen->content_size =
+        get_oriented_size(raw_content_size, screen->orientation);
+    // This function is also called from the ImGui overlay callback, which is
+    // itself inside sc_display_render(). Rendering here would recurse until a
+    // crash. Keep the outer window fixed while dragging, refresh the geometry
+    // snapshot only, and let the next video frame present the new viewport.
+    if (screen->has_frame) {
+        sc_screen_update_content_rect(screen);
+    }
+}
+
 static bool
 sc_screen_init_size(struct sc_screen *screen) {
     // Before first frame
@@ -610,8 +719,10 @@ sc_screen_init_size(struct sc_screen *screen) {
 
     // The requested size is passed via screen->frame_size
 
+    sc_screen_resolve_crop(screen);
+    struct sc_size raw_content_size = sc_screen_get_raw_content_size(screen);
     struct sc_size content_size =
-        get_oriented_size(screen->frame_size, screen->orientation);
+        get_oriented_size(raw_content_size, screen->orientation);
     screen->content_size = content_size;
 
     enum sc_display_result res =
@@ -631,9 +742,11 @@ prepare_for_frame(struct sc_screen *screen, struct sc_size new_frame_size) {
 
     // frame dimension changed
     screen->frame_size = new_frame_size;
+    sc_screen_resolve_crop(screen);
 
+    struct sc_size raw_content_size = sc_screen_get_raw_content_size(screen);
     struct sc_size new_content_size =
-        get_oriented_size(new_frame_size, screen->orientation);
+        get_oriented_size(raw_content_size, screen->orientation);
     set_content_size(screen, new_content_size);
 
     sc_screen_update_content_rect(screen);
@@ -837,6 +950,14 @@ sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event) {
                 case SDL_WINDOWEVENT_SIZE_CHANGED:
                     sc_screen_render(screen, true);
                     break;
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+                case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+                    // Moving the window to a monitor with another DPI may
+                    // change the renderer output without a logical-size
+                    // change. Refresh the content rect and input mapping.
+                    sc_screen_render(screen, true);
+                    break;
+#endif
                 case SDL_WINDOWEVENT_MAXIMIZED:
                     screen->maximized = true;
                     break;
@@ -875,73 +996,157 @@ struct sc_point
 sc_screen_convert_drawable_to_frame_coords(struct sc_screen *screen,
                                            int32_t x, int32_t y) {
     assert(screen->video);
-
-    enum sc_orientation orientation = screen->orientation;
-
-    int32_t w = screen->content_size.width;
-    int32_t h = screen->content_size.height;
-
-    // screen->rect must be initialized to avoid a division by zero
-    assert(screen->rect.w && screen->rect.h);
-
-    x = (int64_t) (x - screen->rect.x) * w / screen->rect.w;
-    y = (int64_t) (y - screen->rect.y) * h / screen->rect.h;
-
-    struct sc_point result;
-    switch (orientation) {
-        case SC_ORIENTATION_0:
-            result.x = x;
-            result.y = y;
-            break;
-        case SC_ORIENTATION_90:
-            result.x = y;
-            result.y = w - x;
-            break;
-        case SC_ORIENTATION_180:
-            result.x = w - x;
-            result.y = h - y;
-            break;
-        case SC_ORIENTATION_270:
-            result.x = h - y;
-            result.y = x;
-            break;
-        case SC_ORIENTATION_FLIP_0:
-            result.x = w - x;
-            result.y = y;
-            break;
-        case SC_ORIENTATION_FLIP_90:
-            result.x = h - y;
-            result.y = w - x;
-            break;
-        case SC_ORIENTATION_FLIP_180:
-            result.x = x;
-            result.y = h - y;
-            break;
-        default:
-            assert(orientation == SC_ORIENTATION_FLIP_270);
-            result.x = y;
-            result.y = x;
-            break;
+    struct sc_screen_coords coords;
+    if (!sc_screen_get_coords(screen, &coords)) {
+        return (struct sc_point) {0, 0};
     }
-
-    return result;
+    struct sc_screen_fpoint window = {
+        .x = x * coords.window_size.width / coords.output_size.width,
+        .y = y * coords.window_size.height / coords.output_size.height,
+    };
+    struct sc_screen_fpoint frame;
+    if (!sc_screen_coords_window_to_frame_point(&coords, window, &frame)) {
+        return (struct sc_point) {0, 0};
+    }
+    return (struct sc_point) {(int32_t) frame.x, (int32_t) frame.y};
 }
 
 struct sc_point
 sc_screen_convert_window_to_frame_coords(struct sc_screen *screen,
                                          int32_t x, int32_t y) {
-    sc_screen_hidpi_scale_coords(screen, &x, &y);
-    return sc_screen_convert_drawable_to_frame_coords(screen, x, y);
+    struct sc_screen_fpoint frame;
+    if (!sc_screen_window_to_frame_point_f(
+            screen, (struct sc_screen_fpoint) {x, y}, &frame)) {
+        return (struct sc_point) {0, 0};
+    }
+    return (struct sc_point) {(int32_t) frame.x, (int32_t) frame.y};
+}
+
+bool
+sc_screen_window_to_frame_position(struct sc_screen *screen, int32_t x,
+                                   int32_t y, struct sc_position *position) {
+    if (!position) {
+        return false;
+    }
+
+    struct sc_screen_coords coords;
+    if (!sc_screen_get_coords(screen, &coords)) {
+        return false;
+    }
+
+    struct sc_screen_fpoint frame;
+    bool ok = sc_screen_coords_window_to_frame_point_checked(
+        &coords, (struct sc_screen_fpoint) {(float) x, (float) y}, &frame);
+    if (!ok) {
+        return false;
+    }
+
+    *position = (struct sc_position) {
+        .screen_size = screen->frame_size,
+        .point = {
+            .x = (int32_t) frame.x,
+            .y = (int32_t) frame.y,
+        },
+    };
+    return true;
 }
 
 void
 sc_screen_hidpi_scale_coords(struct sc_screen *screen, int32_t *x, int32_t *y) {
-    // take the HiDPI scaling (dw/ww and dh/wh) into account
+    // Take the renderer output scaling (dw/ww and dh/wh) into account. The
+    // content rectangle is expressed in renderer coordinates, so querying a
+    // GL drawable here would mix coordinate spaces for non-GL backends.
     int ww, wh, dw, dh;
     SDL_GetWindowSize(screen->window, &ww, &wh);
-    SDL_GL_GetDrawableSize(screen->window, &dw, &dh);
+    if (SDL_GetRendererOutputSize(screen->display.renderer, &dw, &dh)
+            || ww <= 0 || wh <= 0) {
+        return;
+    }
 
     // scale for HiDPI (64 bits for intermediate multiplications)
     *x = (int64_t) *x * dw / ww;
     *y = (int64_t) *y * dh / wh;
+}
+
+static bool
+sc_screen_get_coords(struct sc_screen *screen,
+                     struct sc_screen_coords *coords) {
+    int ww;
+    int wh;
+    int ow;
+    int oh;
+    SDL_GetWindowSize(screen->window, &ww, &wh);
+    if (SDL_GetRendererOutputSize(screen->display.renderer, &ow, &oh)) {
+        return false;
+    }
+
+    *coords = (struct sc_screen_coords) {
+        .frame_size = {
+            .width = screen->frame_size.width,
+            .height = screen->frame_size.height,
+        },
+        .frame_rect = screen->crop.preview
+            ? (struct sc_screen_frect) {
+                .x = 0.0f,
+                .y = 0.0f,
+                .width = screen->frame_size.width,
+                .height = screen->frame_size.height,
+            }
+            : (struct sc_screen_frect) {
+                .x = screen->crop.source.x,
+                .y = screen->crop.source.y,
+                .width = screen->crop.source.w,
+                .height = screen->crop.source.h,
+            },
+        .content_size = {
+            .width = screen->content_size.width,
+            .height = screen->content_size.height,
+        },
+        .output_size = {.width = ow, .height = oh},
+        .window_size = {.width = ww, .height = wh},
+        .content_rect = {
+            .x = screen->rect.x,
+            .y = screen->rect.y,
+            .width = screen->rect.w,
+            .height = screen->rect.h,
+        },
+        .orientation = screen->orientation,
+    };
+    return sc_screen_coords_is_valid(coords);
+}
+
+bool
+sc_screen_frame_to_window_point_f(struct sc_screen *screen,
+                                  struct sc_screen_fpoint frame,
+                                  struct sc_screen_fpoint *window) {
+    struct sc_screen_coords coords;
+    return sc_screen_get_coords(screen, &coords)
+        && sc_screen_coords_frame_to_window_point(&coords, frame, window);
+}
+
+bool
+sc_screen_window_to_frame_point_f(struct sc_screen *screen,
+                                  struct sc_screen_fpoint window,
+                                  struct sc_screen_fpoint *frame) {
+    struct sc_screen_coords coords;
+    return sc_screen_get_coords(screen, &coords)
+        && sc_screen_coords_window_to_frame_point(&coords, window, frame);
+}
+
+bool
+sc_screen_frame_to_window_vector_f(struct sc_screen *screen,
+                                   struct sc_screen_fpoint frame,
+                                   struct sc_screen_fpoint *window) {
+    struct sc_screen_coords coords;
+    return sc_screen_get_coords(screen, &coords)
+        && sc_screen_coords_frame_to_window_vector(&coords, frame, window);
+}
+
+bool
+sc_screen_window_to_frame_vector_f(struct sc_screen *screen,
+                                   struct sc_screen_fpoint window,
+                                   struct sc_screen_fpoint *frame) {
+    struct sc_screen_coords coords;
+    return sc_screen_get_coords(screen, &coords)
+        && sc_screen_coords_window_to_frame_vector(&coords, window, frame);
 }

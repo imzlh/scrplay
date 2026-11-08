@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=scrplay (console)
+GenericName=Android Remote Control
+Comment=Display and control your Android device
+# For some users, the PATH or ADB environment variables are set from the shell
+# startup file, like .bashrc or .zshrc… Run an interactive shell to get
+# environment correctly initialized.
+Exec=/bin/sh -c "\\$SHELL -i -c 'scrplay --pause-on-exit=if-error'"
+Icon=scrplay
+Terminal=true
+Type=Application
+Categories=Utility;RemoteAccess;
+StartupNotify=false

@@ -330,8 +330,24 @@ sc_control_msg_is_droppable(const struct sc_control_msg *msg) {
     // UHID_INPUT messages for this device to be invalid.
     // Cannot drop UHID_DESTROY messages either, because a further UHID_CREATE
     // with the same id may fail.
-    return msg->type != SC_CONTROL_MSG_TYPE_UHID_CREATE
-        && msg->type != SC_CONTROL_MSG_TYPE_UHID_DESTROY;
+    if (msg->type == SC_CONTROL_MSG_TYPE_UHID_CREATE
+            || msg->type == SC_CONTROL_MSG_TYPE_UHID_DESTROY) {
+        return false;
+    }
+
+    // Touch stream boundaries establish and release server-side pointer
+    // state. Dropping DOWN creates orphan MOVE events; dropping UP/CANCEL can
+    // leave a virtual finger stuck on the device. Only high-frequency motion
+    // (finger MOVE or mouse HOVER_MOVE) is safe to discard under load. Keep
+    // every other action conservative, including any future boundary action.
+    if (msg->type == SC_CONTROL_MSG_TYPE_INJECT_TOUCH_EVENT) {
+        int action = msg->inject_touch_event.action
+                   & AMOTION_EVENT_ACTION_MASK;
+        return action == AMOTION_EVENT_ACTION_MOVE
+            || action == AMOTION_EVENT_ACTION_HOVER_MOVE;
+    }
+
+    return true;
 }
 
 void

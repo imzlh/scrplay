@@ -23,7 +23,7 @@ sc_file_executable_exists(const char *file);
 #endif
 
 /**
- * Return the absolute path of the executable (the scrcpy binary)
+ * Return the absolute path of the executable (the scrplay binary)
  *
  * The result must be freed by the caller using free(). It may return NULL on
  * error.

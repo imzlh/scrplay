@@ -21,6 +21,15 @@ src = [
     'src/file_pusher.c',
     'src/fps_counter.c',
     'src/frame_buffer.c',
+    'src/game/game.c',
+    'src/game/game_direct_touch.c',
+    'src/game/game_engine.c',
+    'src/game/game_profile.c',
+    'src/game/game_profile_check.c',
+    'src/game/game_storage.c',
+    'src/game/game_templates.c',
+    'src/game/game_ui.c',
+    'src/game/imgui_shim.cpp',
     'src/input_manager.c',
     'src/keyboard_sdk.c',
     'src/mouse_capture.c',
@@ -30,8 +39,9 @@ src = [
     'src/packet_merger.c',
     'src/receiver.c',
     'src/recorder.c',
-    'src/scrcpy.c',
+    'src/scrplay.c',
     'src/screen.c',
+    'src/screen_coords.c',
     'src/server.c',
     'src/version.c',
     'src/hid/hid_gamepad.c',
@@ -76,7 +86,7 @@ if host_machine.system() == 'windows'
     src += [
         'src/sys/win/file.c',
         'src/sys/win/process.c',
-        windows.compile_resources('scrcpy-windows.rc'),
+        windows.compile_resources('scrplay-windows.rc'),
     ]
     conf.set('_WIN32_WINNT', '0x0600')
     conf.set('WINVER', '0x0600')
@@ -102,7 +112,7 @@ if usb_support
         'src/usb/gamepad_aoa.c',
         'src/usb/keyboard_aoa.c',
         'src/usb/mouse_aoa.c',
-        'src/usb/scrcpy_otg.c',
+        'src/usb/scrplay_otg.c',
         'src/usb/screen_otg.c',
         'src/usb/usb.c',
     ]
@@ -119,6 +129,14 @@ dependencies = [
     dependency('libswresample', static: static),
     dependency('sdl2', version: '>= 2.0.5', static: static),
 ]
+
+# Game-mode coordinate and easing math uses the C math library. On platforms
+# where it is part of the C runtime (notably Windows), find_library() is a
+# no-op/fallback and keeps the dependency portable.
+math_dep = cc.find_library('m', required: false)
+if math_dep.found()
+    dependencies += math_dep
+endif
 
 if v4l2_support
     dependencies += dependency('libavdevice', static: static)
@@ -153,12 +171,12 @@ conf.set('HAVE_SOCK_CLOEXEC', host_machine.system() != 'windows' and
                               cc.has_header_symbol('sys/socket.h', 'SOCK_CLOEXEC'))
 
 # the version, updated on release
-conf.set_quoted('SCRCPY_VERSION', meson.project_version())
+conf.set_quoted('SCRPLAY_VERSION', meson.project_version())
 
 # the prefix used during configuration (meson --prefix=PREFIX)
 conf.set_quoted('PREFIX', get_option('prefix'))
 
-# build a "portable" version (with scrcpy-server accessible from the same
+# build a "portable" version (with scrplay-server accessible from the same
 # directory as the executable)
 conf.set('PORTABLE', get_option('portable'))
 
@@ -180,30 +198,54 @@ configure_file(configuration: conf, output: 'config.h')
 
 src_dir = include_directories('src')
 
-executable('scrcpy', src,
+# Dear ImGui + cimgui C bindings, vendored in third_party/ (game mode UI)
+third_party_dir = include_directories('../third_party')
+imgui_dir = include_directories(
+    '../third_party/imgui',
+    '../third_party/imgui/backends',
+    '../third_party/cimgui',
+)
+
+imgui_lib = static_library('imgui',
+           '../third_party/imgui/imgui.cpp',
+           '../third_party/imgui/imgui_demo.cpp',
+           '../third_party/imgui/imgui_draw.cpp',
+           '../third_party/imgui/imgui_tables.cpp',
+           '../third_party/imgui/imgui_widgets.cpp',
+           '../third_party/imgui/backends/imgui_impl_sdl2.cpp',
+           '../third_party/imgui/backends/imgui_impl_sdlrenderer2.cpp',
+           '../third_party/cimgui/cimgui.cpp',
+           include_directories: [imgui_dir, third_party_dir],
+           dependencies: dependencies)
+
+# cimgui.h re-declares enums and structs in plain C when this is defined
+game_c_args = ['-DCIMGUI_DEFINE_ENUMS_AND_STRUCTS']
+
+executable('scrplay', src,
            dependencies: dependencies,
-           include_directories: src_dir,
-           install: true,
-           c_args: [])
+           include_directories: [src_dir, imgui_dir],
+           link_with: imgui_lib,
+           c_args: game_c_args,
+           install: true)
 
 # <https://mesonbuild.com/Builtin-options.html#directories>
 datadir = get_option('datadir') # by default 'share'
 
-install_man('scrcpy.1')
+install_man('scrplay.1')
 install_data('data/icon.png',
-             rename: 'scrcpy.png',
+             rename: 'scrplay.png',
              install_dir: datadir / 'icons/hicolor/256x256/apps')
-install_data('data/zsh-completion/_scrcpy',
+install_data('data/zsh-completion/_scrplay',
              install_dir: datadir / 'zsh/site-functions')
-install_data('data/bash-completion/scrcpy',
+install_data('data/bash-completion/scrplay',
              install_dir: datadir / 'bash-completion/completions')
 
 # Desktop entry file for application launchers
 if host_machine.system() == 'linux'
-    # Install a launcher (ex: /usr/local/share/applications/scrcpy.desktop)
-    install_data('data/scrcpy.desktop',
+    # Install a launcher (ex: /usr/local/share/applications/scrplay.desktop)
+    install_data('data/scrplay.desktop',
                  install_dir: datadir / 'applications')
-    install_data('data/scrcpy-console.desktop',
+    install_data('data/scrplay-console.desktop',
                  install_dir: datadir / 'applications')
 endif
 
@@ -252,9 +294,50 @@ if get_option('buildtype') == 'debug'
             'tests/test_orientation.c',
             'src/options.c',
         ]],
+        ['test_screen_coords', [
+            'tests/test_screen_coords.c',
+            'src/screen_coords.c',
+        ]],
         ['test_strbuf', [
             'tests/test_strbuf.c',
             'src/util/strbuf.c',
+        ]],
+        ['test_game_profile', [
+            'tests/test_game_profile.c',
+            'src/game/game_profile.c',
+        ]],
+        ['test_game_engine', [
+            'tests/test_game_engine.c',
+            'src/game/game_engine.c',
+            'src/game/game_profile.c',
+            'src/util/thread.c',
+            'src/util/tick.c',
+            'src/util/log.c',
+        ]],
+        ['test_game_direct_touch', [
+            'tests/test_game_direct_touch.c',
+            'src/game/game_direct_touch.c',
+        ]],
+        ['test_game_profile_check', [
+            'tests/test_game_profile_check.c',
+            'src/game/game_profile_check.c',
+            'src/game/game_profile.c',
+        ]],
+        ['test_game_storage', [
+            'tests/test_game_storage.c',
+            'src/game/game_storage.c',
+            'src/game/game_profile.c',
+        ]],
+        ['test_game_templates', [
+            'tests/test_game_templates.c',
+            'src/game/game_profile_check.c',
+            'src/game/game_templates.c',
+            'src/game/game_profile.c',
+        ]],
+        ['test_keyboard_sdk', [
+            'tests/test_keyboard_sdk.c',
+            'src/keyboard_sdk.c',
+            'src/util/intmap.c',
         ]],
         ['test_str', [
             'tests/test_str.c',
@@ -282,6 +365,6 @@ endif
 
 if meson.version().version_compare('>= 0.58.0')
        devenv = environment()
-       devenv.set('SCRCPY_ICON_PATH', meson.current_source_dir() / 'data/icon.png')
+       devenv.set('SCRPLAY_ICON_PATH', meson.current_source_dir() / 'data/icon.png')
        meson.add_devenv(devenv)
 endif

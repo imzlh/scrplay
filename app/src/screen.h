@@ -18,6 +18,7 @@
 #include "input_manager.h"
 #include "mouse_capture.h"
 #include "options.h"
+#include "screen_coords.h"
 #include "trait/key_processor.h"
 #include "trait/frame_sink.h"
 #include "trait/mouse_processor.h"
@@ -49,7 +50,23 @@ struct sc_screen {
 
     SDL_Window *window;
     struct sc_size frame_size;
-    struct sc_size content_size; // rotated frame_size
+    // Size of the currently displayed raw-frame rectangle after client
+    // orientation. In crop-preview mode this is the complete frame; during
+    // normal use it is the selected crop.
+    struct sc_size content_size;
+
+    struct {
+        bool enabled;
+        bool preview;
+        // Persisted values use normalized complete-frame coordinates.
+        float left;
+        float top;
+        float right;
+        float bottom;
+        // One resolved integer rectangle is shared by rendering and input
+        // coordinates so rounding can never make them disagree.
+        SDL_Rect source;
+    } crop;
 
     bool resize_pending; // resize requested while fullscreen or maximized
     // The content size the last time the window was not maximized or
@@ -84,6 +101,9 @@ struct sc_screen_params {
     bool legacy_paste;
     bool clipboard_autosync;
     uint8_t shortcut_mods; // OR of enum sc_shortcut_mod values
+
+    // Game mode owns keyboard shortcuts and mouse capture policy.
+    bool game_mode;
 
     const char *window_title;
     bool always_on_top;
@@ -143,12 +163,20 @@ void
 sc_screen_set_orientation(struct sc_screen *screen,
                           enum sc_orientation orientation);
 
+// Apply a client-side crop without restarting the video stream. The complete
+// decoded frame and injected screen_size remain unchanged. In preview mode,
+// the complete frame is shown so an album-style editor may shade the discarded
+// area and drag every edge in either direction.
+void
+sc_screen_set_crop(struct sc_screen *screen, bool enabled, float left,
+                   float top, float right, float bottom, bool preview);
+
 // set the display pause state
 void
 sc_screen_set_paused(struct sc_screen *screen, bool paused);
 
 // react to SDL events
-// If this function returns false, scrcpy must exit with an error.
+// If this function returns false, scrplay must exit with an error.
 bool
 sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event);
 
@@ -157,6 +185,12 @@ sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event);
 struct sc_point
 sc_screen_convert_window_to_frame_coords(struct sc_screen *screen,
                                         int32_t x, int32_t y);
+
+// Convert an SDL window point to an injectable frame position. Return false
+// on black borders/outside the video or if the geometry is not ready.
+bool
+sc_screen_window_to_frame_position(struct sc_screen *screen, int32_t x,
+                                   int32_t y, struct sc_position *position);
 
 // convert point from drawable coordinates to frame coordinates
 // x and y are expressed in pixels
@@ -170,5 +204,29 @@ sc_screen_convert_drawable_to_frame_coords(struct sc_screen *screen,
 // otherwise.
 void
 sc_screen_hidpi_scale_coords(struct sc_screen *screen, int32_t *x, int32_t *y);
+
+// Floating-point coordinate transforms backed by one coherent snapshot of
+// the SDL window, renderer output, content rectangle and display orientation.
+// Point transforms include letterboxing; vector transforms intentionally do
+// not, so they are suitable for relative mouse motion and element radii.
+bool
+sc_screen_frame_to_window_point_f(struct sc_screen *screen,
+                                  struct sc_screen_fpoint frame,
+                                  struct sc_screen_fpoint *window);
+
+bool
+sc_screen_window_to_frame_point_f(struct sc_screen *screen,
+                                  struct sc_screen_fpoint window,
+                                  struct sc_screen_fpoint *frame);
+
+bool
+sc_screen_frame_to_window_vector_f(struct sc_screen *screen,
+                                   struct sc_screen_fpoint frame,
+                                   struct sc_screen_fpoint *window);
+
+bool
+sc_screen_window_to_frame_vector_f(struct sc_screen *screen,
+                                   struct sc_screen_fpoint window,
+                                   struct sc_screen_fpoint *frame);
 
 #endif

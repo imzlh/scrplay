@@ -44,7 +44,7 @@ sc_adb_init(void) {
     }
 #else
     // For portable builds, use the absolute path to the adb executable
-    // in the same directory as scrcpy (except on Windows, where "adb"
+    // in the same directory as scrplay (except on Windows, where "adb"
     // is sufficient)
     adb_executable = sc_file_get_local_path("adb");
     if (!adb_executable) {
@@ -595,7 +595,7 @@ sc_adb_device_check_state(struct sc_adb_device *device,
         sc_adb_devices_log(SC_LOG_LEVEL_ERROR, devices, count);
         LOGE("A popup should open on the device to request authorization.");
         LOGE("Check the FAQ: "
-             "<https://github.com/Genymobile/scrcpy/blob/master/FAQ.md>");
+             "<https://github.com/imzlh/scrplay/blob/main/FAQ.md>");
     } else {
         LOGE("Device could not be connected (state=%s)", state);
     }

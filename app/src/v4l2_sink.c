@@ -12,16 +12,16 @@
 /** Downcast frame_sink to sc_v4l2_sink */
 #define DOWNCAST(SINK) container_of(SINK, struct sc_v4l2_sink, frame_sink)
 
-static const AVRational SCRCPY_TIME_BASE = {1, 1000000}; // timestamps in us
+static const AVRational SCRPLAY_TIME_BASE = {1, 1000000}; // timestamps in us
 
 static const AVOutputFormat *
 find_muxer(const char *name) {
-#ifdef SCRCPY_LAVF_HAS_NEW_MUXER_ITERATOR_API
+#ifdef SCRPLAY_LAVF_HAS_NEW_MUXER_ITERATOR_API
     void *opaque = NULL;
 #endif
     const AVOutputFormat *oformat = NULL;
     do {
-#ifdef SCRCPY_LAVF_HAS_NEW_MUXER_ITERATOR_API
+#ifdef SCRPLAY_LAVF_HAS_NEW_MUXER_ITERATOR_API
         oformat = av_muxer_iterate(&opaque);
 #else
         oformat = av_oformat_next(oformat);
@@ -59,7 +59,7 @@ write_header(struct sc_v4l2_sink *vs, const AVPacket *packet) {
 static void
 rescale_packet(struct sc_v4l2_sink *vs, AVPacket *packet) {
     AVStream *ostream = vs->format_ctx->streams[0];
-    av_packet_rescale_ts(packet, SCRCPY_TIME_BASE, ostream->time_base);
+    av_packet_rescale_ts(packet, SCRPLAY_TIME_BASE, ostream->time_base);
 }
 
 static bool
@@ -192,7 +192,7 @@ sc_v4l2_sink_open(struct sc_v4l2_sink *vs, const AVCodecContext *ctx) {
     // still expects a pointer-to-non-const (it has not be updated accordingly)
     // <https://github.com/FFmpeg/FFmpeg/commit/0694d8702421e7aff1340038559c438b61bb30dd>
     vs->format_ctx->oformat = (AVOutputFormat *) format;
-#ifdef SCRCPY_LAVF_HAS_AVFORMATCONTEXT_URL
+#ifdef SCRPLAY_LAVF_HAS_AVFORMATCONTEXT_URL
     vs->format_ctx->url = strdup(vs->device_name);
     if (!vs->format_ctx->url) {
         LOG_OOM();
@@ -258,7 +258,7 @@ sc_v4l2_sink_open(struct sc_v4l2_sink *vs, const AVCodecContext *ctx) {
     vs->stopped = false;
 
     LOGD("Starting v4l2 thread");
-    ok = sc_thread_create(&vs->thread, run_v4l2_sink, "scrcpy-v4l2", vs);
+    ok = sc_thread_create(&vs->thread, run_v4l2_sink, "scrplay-v4l2", vs);
     if (!ok) {
         LOGE("Could not start v4l2 thread");
         goto error_av_packet_free;

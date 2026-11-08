@@ -188,7 +188,7 @@ sc_controller_start(struct sc_controller *controller) {
     LOGD("Starting controller thread");
 
     bool ok = sc_thread_create(&controller->thread, run_controller,
-                               "scrcpy-ctl", controller);
+                               "scrplay-ctl", controller);
     if (!ok) {
         LOGE("Could not start controller thread");
         return false;

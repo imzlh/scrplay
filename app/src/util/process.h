@@ -76,8 +76,8 @@ enum sc_process_result {
  *  - SC_PROCESS_NO_STDOUT
  *  - SC_PROCESS_NO_STDERR
  *
- * It indicates if stdout and stderr must be inherited from the scrcpy process
- * (i.e. if the process must output to the scrcpy console).
+ * It indicates if stdout and stderr must be inherited from the scrplay process
+ * (i.e. if the process must output to the scrplay console).
  */
 enum sc_process_result
 sc_process_execute(const char *const argv[], sc_pid *pid, unsigned flags);

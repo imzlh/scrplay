@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Run scrcpy generated in the specified BUILDDIR.
+# Run scrplay generated in the specified BUILDDIR.
 #
 # This provides the same feature as "ninja run", except that it is possible to
-# pass arguments to scrcpy.
+# pass arguments to scrplay.
 #
-# Syntax: ./run BUILDDIR <scrcpy options ...>
+# Syntax: ./run BUILDDIR <scrplay options ...>
 if [[ $# = 0 ]]
 then
-    echo "Syntax: $0 BUILDDIR <scrcpy options>" >&2
+    echo "Syntax: $0 BUILDDIR <scrplay options>" >&2
     exit 1
 fi
 
@@ -20,6 +20,6 @@ then
     exit 1
 fi
 
-SCRCPY_ICON_PATH="app/data/icon.png" \
-SCRCPY_SERVER_PATH="$BUILDDIR/server/scrcpy-server" \
-"$BUILDDIR/app/scrcpy" "$@"
+SCRPLAY_ICON_PATH="app/data/icon.png" \
+SCRPLAY_SERVER_PATH="$BUILDDIR/server/scrplay-server" \
+"$BUILDDIR/app/scrplay" "$@"

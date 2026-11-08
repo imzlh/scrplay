@@ -446,6 +446,28 @@ static void test_serialize_reset_video(void) {
     assert(!memcmp(buf, expected, sizeof(expected)));
 }
 
+static void test_touch_stream_boundaries_are_not_droppable(void) {
+    struct sc_control_msg msg = {
+        .type = SC_CONTROL_MSG_TYPE_INJECT_TOUCH_EVENT,
+    };
+
+    msg.inject_touch_event.action = AMOTION_EVENT_ACTION_DOWN;
+    assert(!sc_control_msg_is_droppable(&msg));
+    msg.inject_touch_event.action = AMOTION_EVENT_ACTION_UP;
+    assert(!sc_control_msg_is_droppable(&msg));
+    msg.inject_touch_event.action = AMOTION_EVENT_ACTION_CANCEL;
+    assert(!sc_control_msg_is_droppable(&msg));
+
+    msg.inject_touch_event.action = AMOTION_EVENT_ACTION_MOVE;
+    assert(sc_control_msg_is_droppable(&msg));
+    msg.inject_touch_event.action = AMOTION_EVENT_ACTION_HOVER_MOVE;
+    assert(sc_control_msg_is_droppable(&msg));
+    msg.inject_touch_event.action = AMOTION_EVENT_ACTION_POINTER_DOWN | 0x100;
+    assert(!sc_control_msg_is_droppable(&msg));
+    msg.inject_touch_event.action = AMOTION_EVENT_ACTION_POINTER_UP | 0x200;
+    assert(!sc_control_msg_is_droppable(&msg));
+}
+
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
@@ -470,5 +492,6 @@ int main(int argc, char *argv[]) {
     test_serialize_open_hard_keyboard();
     test_serialize_start_app();
     test_serialize_reset_video();
+    test_touch_stream_boundaries_are_not_droppable();
     return 0;
 }

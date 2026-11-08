@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# This script bump scrcpy version by editing all the necessary files.
+# This script bump scrplay version by editing all the necessary files.
 #
 # Usage:
 #
@@ -29,6 +29,6 @@ VERSION_CODE="$(( $MAJOR * 10000 + $MINOR * 100 + "$PATCH" ))"
 echo "$VERSION: major=$MAJOR minor=$MINOR patch=$PATCH [versionCode=$VERSION_CODE]"
 sed -i "s/^\(\s*version: \)'[^']*'/\1'$VERSION'/" meson.build
 sed -i "s/^\(\s*versionCode \).*/\1$VERSION_CODE/;s/^\(\s*versionName \).*/\1\"$VERSION\"/" server/build.gradle
-sed -i "s/^\(SCRCPY_VERSION_NAME=\).*/\1$VERSION/" server/build_without_gradle.sh
-sed -i "s/^\(\s*VALUE \"ProductVersion\", \)\"[^\"]*\"/\1\"$VERSION\"/" app/scrcpy-windows.rc
+sed -i "s/^\(SCRPLAY_VERSION_NAME=\).*/\1$VERSION/" server/build_without_gradle.sh
+sed -i "s/^\(\s*VALUE \"ProductVersion\", \)\"[^\"]*\"/\1\"$VERSION\"/" app/scrplay-windows.rc
 echo done

@@ -31,6 +31,9 @@ sc_display_init_novideo_icon(struct sc_display *display,
 bool
 sc_display_init(struct sc_display *display, SDL_Window *window,
                 SDL_Surface *icon_novideo, bool mipmaps) {
+    display->overlay_callback = NULL;
+    display->overlay_userdata = NULL;
+
     display->renderer =
         SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (!display->renderer) {
@@ -97,7 +100,7 @@ sc_display_init(struct sc_display *display, SDL_Window *window,
     display->has_frame = false;
 
     if (icon_novideo) {
-        // Without video, set a static scrcpy icon as window content
+        // Without video, set a static scrplay icon as window content
         bool ok = sc_display_init_novideo_icon(display, icon_novideo);
         if (!ok) {
 #ifdef SC_DISPLAY_FORCE_OPENGL_CORE_PROFILE
@@ -299,9 +302,18 @@ sc_display_update_texture(struct sc_display *display, const AVFrame *frame) {
 }
 
 enum sc_display_result
-sc_display_render(struct sc_display *display, const SDL_Rect *geometry,
-                  enum sc_orientation orientation) {
-    SDL_RenderClear(display->renderer);
+sc_display_render(struct sc_display *display, const SDL_Rect *source,
+                  const SDL_Rect *geometry, enum sc_orientation orientation) {
+    SDL_Renderer *renderer = display->renderer;
+
+    // Cropped video may intentionally leave part of the renderer unused
+    // (notably in the crop editor preview). Clear it to a deterministic,
+    // opaque black before submitting only the selected texture region.
+    if (SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE)
+            || SDL_RenderClear(renderer)) {
+        LOGE("Could not clear renderer: %s", SDL_GetError());
+        return SC_DISPLAY_RESULT_ERROR;
+    }
 
     if (display->pending.flags) {
         bool ok = sc_display_apply_pending(display);
@@ -310,11 +322,10 @@ sc_display_render(struct sc_display *display, const SDL_Rect *geometry,
         }
     }
 
-    SDL_Renderer *renderer = display->renderer;
     SDL_Texture *texture = display->texture;
 
     if (orientation == SC_ORIENTATION_0) {
-        int ret = SDL_RenderCopy(renderer, texture, NULL, geometry);
+        int ret = SDL_RenderCopy(renderer, texture, source, geometry);
         if (ret) {
             LOGE("Could not render texture: %s", SDL_GetError());
             return SC_DISPLAY_RESULT_ERROR;
@@ -338,7 +349,7 @@ sc_display_render(struct sc_display *display, const SDL_Rect *geometry,
         SDL_RendererFlip flip = sc_orientation_is_mirror(orientation)
                               ? SDL_FLIP_HORIZONTAL : 0;
 
-        int ret = SDL_RenderCopyEx(renderer, texture, NULL, dstrect, angle,
+        int ret = SDL_RenderCopyEx(renderer, texture, source, dstrect, angle,
                                    NULL, flip);
         if (ret) {
             LOGE("Could not render texture: %s", SDL_GetError());
@@ -346,6 +357,19 @@ sc_display_render(struct sc_display *display, const SDL_Rect *geometry,
         }
     }
 
+    if (display->overlay_callback) {
+        display->overlay_callback(display->renderer, display->overlay_userdata);
+    }
+
     SDL_RenderPresent(display->renderer);
     return SC_DISPLAY_RESULT_OK;
+}
+
+void
+sc_display_set_overlay_callback(struct sc_display *display,
+                                void (*callback)(SDL_Renderer *renderer,
+                                                 void *userdata),
+                                void *userdata) {
+    display->overlay_callback = callback;
+    display->overlay_userdata = userdata;
 }

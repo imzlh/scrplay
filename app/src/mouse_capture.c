@@ -8,6 +8,19 @@ sc_mouse_capture_init(struct sc_mouse_capture *mc, SDL_Window *window,
                       uint8_t shortcut_mods) {
     mc->window = window;
     mc->sdl_mouse_capture_keys = sc_shortcut_mods_to_sdl(shortcut_mods);
+    mc->recenter = false;
+#ifdef SDL_HINT_MOUSE_RELATIVE_MODE_CENTER
+    mc->saved_relative_mode_center = SDL_GetHintBoolean(
+        SDL_HINT_MOUSE_RELATIVE_MODE_CENTER, SDL_TRUE);
+#else
+    mc->saved_relative_mode_center = true;
+#endif
+#ifdef SDL_HINT_MOUSE_RELATIVE_WARP_MOTION
+    mc->saved_relative_warp_motion = SDL_GetHintBoolean(
+        SDL_HINT_MOUSE_RELATIVE_WARP_MOTION, SDL_FALSE);
+#else
+    mc->saved_relative_warp_motion = false;
+#endif
     mc->mouse_capture_key_pressed = SDLK_UNKNOWN;
 }
 
@@ -108,6 +121,78 @@ sc_mouse_capture_set_active(struct sc_mouse_capture *mc, bool capture) {
         LOGE("Could not set relative mouse mode to %s: %s",
              capture ? "true" : "false", SDL_GetError());
     }
+    // Confine the pointer to the window while captured (SDL relative mode
+    // alone does not confine on every platform/backend).
+    SDL_SetWindowGrab(mc->window, capture);
+
+    // SDL_SetRelativeMouseMode() flushes pending motion. Center only after it
+    // succeeds, so entering mapped play cannot inject the absolute warp as a
+    // large first aim delta.
+    if (capture && sc_mouse_capture_is_active(mc)) {
+        sc_mouse_capture_recenter(mc);
+    }
+}
+
+void
+sc_mouse_capture_set_recenter(struct sc_mouse_capture *mc, bool enabled) {
+    mc->recenter = enabled;
+    if (!enabled) {
+        // The hints are process-global. Restore the policy that existed when
+        // the screen was created so F8 native mode is not silently changed by
+        // mapped gameplay's center anchoring.
+#ifdef SDL_HINT_MOUSE_RELATIVE_MODE_CENTER
+        SDL_SetHintWithPriority(SDL_HINT_MOUSE_RELATIVE_MODE_CENTER,
+            mc->saved_relative_mode_center ? "1" : "0", SDL_HINT_OVERRIDE);
+#endif
+#ifdef SDL_HINT_MOUSE_RELATIVE_WARP_MOTION
+        SDL_SetHintWithPriority(SDL_HINT_MOUSE_RELATIVE_WARP_MOTION,
+            mc->saved_relative_warp_motion ? "1" : "0", SDL_HINT_OVERRIDE);
+#endif
+        return;
+    }
+
+    // Keep raw relative input (do not enable SDL's warp implementation), but
+    // make explicit center warps silent. This is the supported way to avoid a
+    // synthetic inverse delta; a "skip next motion" flag would occasionally
+    // eat real input on backends where a warp emits no event at all.
+#ifdef SDL_HINT_MOUSE_RELATIVE_MODE_CENTER
+    if (!SDL_SetHintWithPriority(SDL_HINT_MOUSE_RELATIVE_MODE_CENTER, "1",
+                                 SDL_HINT_OVERRIDE)) {
+        LOGW("Could not enable centered relative mouse mode");
+    }
+#endif
+#ifdef SDL_HINT_MOUSE_RELATIVE_WARP_MOTION
+    if (!SDL_SetHintWithPriority(SDL_HINT_MOUSE_RELATIVE_WARP_MOTION, "0",
+                                 SDL_HINT_OVERRIDE)) {
+        LOGW("Could not suppress relative mouse warp motion");
+    }
+#endif
+
+    // This also covers a policy change while relative mode is already active.
+    sc_mouse_capture_recenter(mc);
+}
+
+void
+sc_mouse_capture_recenter(struct sc_mouse_capture *mc) {
+    if (!mc->recenter || !sc_mouse_capture_is_active(mc)) {
+        return;
+    }
+
+    // SDL mouse/window event coordinates are logical window points. Renderer
+    // output pixels would be wrong on HiDPI displays.
+    int width;
+    int height;
+    SDL_GetWindowSize(mc->window, &width, &height);
+    if (width > 0 && height > 0) {
+        SDL_WarpMouseInWindow(mc->window, width / 2, height / 2);
+    }
+}
+
+void
+sc_mouse_capture_set_keys(struct sc_mouse_capture *mc,
+                          uint16_t sdl_mouse_capture_keys) {
+    mc->sdl_mouse_capture_keys = sdl_mouse_capture_keys;
+    mc->mouse_capture_key_pressed = SDLK_UNKNOWN;
 }
 
 bool
