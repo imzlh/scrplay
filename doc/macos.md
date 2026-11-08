@@ -17,12 +17,12 @@ Download a static build of the [latest release]:
 
 and extract it.
 
-_Static builds of scrcpy for macOS are still experimental._
+_Static builds of scrplay for macOS are still experimental._
 
 
 ### From a package manager
 
-Scrcpy is available in [Homebrew]:
+Scrplay is available in [Homebrew]:
 
 ```bash
 brew install scrcpy
@@ -36,7 +36,7 @@ You need `adb`, accessible from your `PATH`. If you don't have it yet:
 brew install --cask android-platform-tools
 ```
 
-Alternatively, Scrcpy is also available in [MacPorts], which sets up `adb` for you:
+Alternatively, Scrplay is also available in [MacPorts], which sets up `adb` for you:
 
 ```bash
 sudo port install scrcpy
@@ -54,16 +54,16 @@ _Make sure that your device meets the [prerequisites](/README.md#prerequisites).
 Once installed, run from a terminal:
 
 ```bash
-scrcpy
+scrplay
 ```
 
 or with arguments (here to disable audio and record to `file.mkv`):
 
 ```bash
-scrcpy --no-audio --record=file.mkv
+scrplay --no-audio --record=file.mkv
 ```
 
 Documentation for command line arguments is available:
- - `man scrcpy`
- - `scrcpy --help`
+ - `man scrplay`
+ - `scrplay --help`
  - on [github](/README.md)

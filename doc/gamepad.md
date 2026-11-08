@@ -24,8 +24,8 @@ device.
 To enable UHID gamepads, use:
 
 ```bash
-scrcpy --gamepad=uhid
-scrcpy -G  # short version
+scrplay --gamepad=uhid
+scrplay -G  # short version
 ```
 
 Note: UHID may not work on old Android versions due to permission errors.
@@ -40,13 +40,13 @@ This mode simulates physical HID gamepads using the [AOAv2] protocol.
 To enable AOA gamepads, use:
 
 ```bash
-scrcpy --gamepad=aoa
+scrplay --gamepad=aoa
 ```
 
 Contrary to the other mode, it works at the USB level directly (so it only works
 over USB).
 
-It does not use the scrcpy server, and does not require `adb` (USB debugging).
+It does not use the scrplay server, and does not require `adb` (USB debugging).
 Therefore, it is possible to control the device (but not mirror) even with USB
 debugging disabled (see [OTG](otg.md)).
 

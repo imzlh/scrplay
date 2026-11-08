@@ -24,7 +24,7 @@ By default, mouse hover (mouse motion without any clicks) events are forwarded
 to the device. This can be disabled with:
 
 ```
-scrcpy --no-mouse-hover
+scrplay --no-mouse-hover
 ```
 
 ## Physical mouse simulation
@@ -49,8 +49,8 @@ device.
 To enable UHID mouse, use:
 
 ```bash
-scrcpy --mouse=uhid
-scrcpy -M  # short version
+scrplay --mouse=uhid
+scrplay -M  # short version
 ```
 
 Note: UHID may not work on old Android versions due to permission errors.
@@ -65,13 +65,13 @@ This mode simulates a physical HID mouse using the [AOAv2] protocol.
 To enable AOA mouse, use:
 
 ```bash
-scrcpy --mouse=aoa
+scrplay --mouse=aoa
 ```
 
 Contrary to the other modes, it works at the USB level directly (so it only
 works over USB).
 
-It does not use the scrcpy server, and does not require `adb` (USB debugging).
+It does not use the scrplay server, and does not require `adb` (USB debugging).
 Therefore, it is possible to control the device (but not mirror) even with USB
 debugging disabled (see [OTG](otg.md)).
 
@@ -129,9 +129,9 @@ Each character must be one of the following:
 For example:
 
 ```bash
-scrcpy --mouse-bind=bhsn:++++  # the default mode for SDK mouse
-scrcpy --mouse-bind=++++:bhsn  # the default mode for AOA and UHID
-scrcpy --mouse-bind=++bh:++sn  # forward right and middle clicks,
+scrplay --mouse-bind=bhsn:++++  # the default mode for SDK mouse
+scrplay --mouse-bind=++++:bhsn  # the default mode for AOA and UHID
+scrplay --mouse-bind=++bh:++sn  # forward right and middle clicks,
                                # use 4th and 5th for BACK and HOME,
                                # use Shift+4th and Shift+5th for APP_SWITCH
                                # and expand notification panel
@@ -141,6 +141,6 @@ The second sequence of bindings may be omitted. In that case, it is the same as
 the first one:
 
 ```bash
-scrcpy --mouse-bind=bhsn
-scrcpy --mouse-bind=bhsn:bhsn  # equivalent
+scrplay --mouse-bind=bhsn
+scrplay --mouse-bind=bhsn:bhsn  # equivalent
 ```

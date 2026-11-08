@@ -9,10 +9,10 @@ If you encounter any error, the first step is to upgrade to the latest version.
 
 ## `adb` and USB issues
 
-`scrcpy` execute `adb` commands to initialize the connection with the device. If
-`adb` fails, then scrcpy will not work.
+`scrplay` execute `adb` commands to initialize the connection with the device. If
+`adb` fails, then scrplay will not work.
 
-This is typically not a bug in _scrcpy_, but a problem in your environment.
+This is typically not a bug in _scrplay_, but a problem in your environment.
 
 
 ### `adb` not found
@@ -69,14 +69,14 @@ In that case, you can either provide the identifier of the device you want to
 mirror:
 
 ```bash
-scrcpy -s 0123456789abcdef
+scrplay -s 0123456789abcdef
 ```
 
 Or request the single USB (or TCP/IP) device:
 
 ```bash
-scrcpy -d  # USB device
-scrcpy -e  # TCP/IP device
+scrplay -d  # USB device
+scrplay -e  # TCP/IP device
 ```
 
 Note that if your device is connected over TCP/IP, you might get this message:
@@ -86,7 +86,7 @@ Note that if your device is connected over TCP/IP, you might get this message:
 >     WARN: 'adb reverse' failed, fallback to 'adb forward'
 
 This is expected (due to a bug on old Android versions, see [#5]), but in that
-case, scrcpy fallbacks to a different method, which should work.
+case, scrplay fallbacks to a different method, which should work.
 
 [#5]: https://github.com/Genymobile/scrcpy/issues/5
 
@@ -99,31 +99,31 @@ This error occurs when you use several `adb` versions simultaneously. You must
 find the program using a different `adb` version, and use the same `adb` version
 everywhere.
 
-You could overwrite the `adb` binary in the other program, or ask _scrcpy_ to
+You could overwrite the `adb` binary in the other program, or ask _scrplay_ to
 use a specific `adb` binary, by setting the `ADB` environment variable:
 
 ```bash
 # in bash
 export ADB=/path/to/your/adb
-scrcpy
+scrplay
 ```
 
 ```cmd
 :: in cmd
 set ADB=C:\path\to\your\adb.exe
-scrcpy
+scrplay
 ```
 
 ```powershell
 # in PowerShell
 $env:ADB = 'C:\path\to\your\adb.exe'
-scrcpy
+scrplay
 ```
 
 
 ### Device disconnected
 
-If _scrcpy_ stops itself with the warning "Device disconnected", then the
+If _scrplay_ stops itself with the warning "Device disconnected", then the
 `adb` connection has been closed.
 
 Try with another USB cable or plug it into another USB port. See [#281] and
@@ -135,7 +135,7 @@ Try with another USB cable or plug it into another USB port. See [#281] and
 
 ## OTG issues on Windows
 
-On Windows, if `scrcpy --otg` (or `--keyboard=aoa`/`--mouse=aoa`) results in:
+On Windows, if `scrplay --otg` (or `--keyboard=aoa`/`--mouse=aoa`) results in:
 
 >     ERROR: Could not find any USB device
 
@@ -189,7 +189,7 @@ By default, SDL uses x11 on Linux. The [video driver] can be changed via the
 
 ```bash
 export SDL_VIDEODRIVER=wayland
-scrcpy
+scrplay
 ```
 
 On some distributions (at least Fedora), the package `libdecor` must be
@@ -203,7 +203,7 @@ See issues [#2554] and [#2559].
 
 ### KWin compositor crashes
 
-On Plasma Desktop, compositor is disabled while _scrcpy_ is running.
+On Plasma Desktop, compositor is disabled while _scrplay_ is running.
 
 As a workaround, [disable "Block compositing"][kwin].
 

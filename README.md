@@ -1,34 +1,57 @@
-**This GitHub repo (<https://github.com/Genymobile/scrcpy>) is the only official
-source for the project. Do not download releases from random websites, even if
-their name contains `scrcpy`.**
+# scrplay
 
-# scrcpy (v3.3.4)
+[![CI](https://github.com/imzlh/scrplay/actions/workflows/ci.yml/badge.svg)](https://github.com/imzlh/scrplay/actions/workflows/ci.yml)
 
-<img src="app/data/icon.svg" width="128" height="128" alt="scrcpy" align="right" />
+<img src="app/data/icon.svg" width="128" height="128" alt="scrplay" align="right" />
 
-_pronounced "**scr**een **c**o**py**"_
+**scrplay** is a fork of [Genymobile/scrcpy](https://github.com/Genymobile/scrcpy)
+(v3.3.4) that adds a **desktop gaming control layer** on top of the mirroring
+core: it maps your computer keyboard and mouse to *human-like synthetic
+touches*, so Android games and cloud games can be played from the desktop —
+no root, no app installed on the device.
 
-This application mirrors Android devices (video and audio) connected via USB or
-[TCP/IP](doc/connection.md#tcpip-wireless) and allows control using the
-computer's keyboard and mouse. It does not require _root_ access or an app
-installed on the device. It works on _Linux_, _Windows_, and _macOS_.
+Everything from upstream scrcpy still works the same: mirroring over USB or
+[TCP/IP](doc/connection.md#tcpip-wireless) with video and audio, control with
+the computer keyboard and mouse, on _Linux_, _Windows_, and _macOS_.
 
-![screenshot](assets/screenshot-debian-600.jpg)
+## 中文速览
 
-It focuses on:
+scrplay 是 scrcpy（v3.3.4）的分支，在原有投屏/控制能力之上增加了**游戏模式**：
+把键鼠操作映射为拟人化的合成触摸来玩手机游戏与云游戏（云游戏版《崩坏：星穹
+铁道》已实测）。WASD 虚拟摇杆、鼠标瞄准视角、窗口内 ImGui 编辑器、profile
+与预设切换、反检测的 ease-out 滑动与位置/时序抖动等特性详见
+[doc/game-mode.md](doc/game-mode.md)；快速启动：构建后执行 `./run-game.sh`
+（开发构建，等价于 `build/app/scrplay --game-mode`，并自动配置 fcitx5/ibus
+输入法环境变量，保证 XWayland 下编辑器可输入中文）。设备端 server 为上游
+未改动的预编译二进制（Java 包名保留 `com.genymobile.scrcpy`）。
 
- - **lightness**: native, displays only the device screen
- - **performance**: 30~120fps, depending on the device
- - **quality**: 1920×1080 or above
- - **low latency**: [35~70ms][lowlatency]
- - **low startup time**: ~1 second to display the first image
- - **non-intrusiveness**: nothing is left installed on the Android device
- - **user benefits**: no account, no ads, no internet required
- - **freedom**: free and open source software
+## Features
 
-[lowlatency]: https://github.com/Genymobile/scrcpy/pull/646
+### Game mode (added by scrplay)
 
-Its features include:
+See [doc/game-mode.md](doc/game-mode.md) for the full manual (in Chinese).
+
+ - keyboard/mouse mapped to synthetic touches: virtual joystick, tap/hold
+   button bindings, repeated swipe gestures, mouse-driven camera aim
+ - in-window ImGui editor: drag elements on screen, rebind keys, tune
+   parameters; changes apply immediately and autosave (debounced)
+ - profiles (`~/.config/scrplay/gameprofiles/*.profile`) with up to 12 presets
+   each, hotkey switching (short press = next preset, long press = plain
+   scrcpy controls), and 8 built-in gameplay templates (open world, driving,
+   turn-based, shooter, MOBA, platformer, rhythm, empty)
+ - run-time HUD: active preset and hotkey hints, preset picker while the mouse
+   is free, auto-collapse during gameplay
+ - anti-detection humanized input: ease-out joystick thumb gliding, random
+   position/timing jitter with configurable amplitude, randomized tap
+   duration; the aim finger exists only while the mouse is captured and is
+   lifted as soon as capture is released
+ - client-side crop editing per profile (bindings are normalized to the full
+   raw frame, so cropping never moves existing bindings)
+ - Alt temporarily releases mouse capture; Alt+left-drag injects a direct
+   finger touch for un-mapped UI buttons
+
+### Inherited from scrcpy v3.3.4
+
  - [audio forwarding](doc/audio.md) (Android 11+)
  - [recording](doc/recording.md)
  - [virtual display](doc/virtual_display.md)
@@ -47,100 +70,65 @@ Its features include:
 
 ## Prerequisites
 
-The Android device requires at least API 21 (Android 5.0).
-
-[Audio forwarding](doc/audio.md) is supported for API >= 30 (Android 11+).
-
-Make sure you [enabled USB debugging][enable-adb] on your device(s).
+The Android device requires at least API 21 (Android 5.0), with
+[USB debugging][enable-adb] enabled, and you must accept the "Allow USB
+debugging" authorization popup on the device (scrplay drives it through `adb`).
 
 [enable-adb]: https://developer.android.com/studio/debug/dev-options#enable
 
-On some devices (especially Xiaomi), you might get the following error:
+On some devices (especially Xiaomi), controlling the device may additionally
+require the `USB debugging (Security Settings)` developer option.
 
+## Quick start (Linux, from source)
+
+```bash
+# runtime + build dependencies (Debian/Ubuntu)
+sudo apt install ffmpeg libsdl2-2.0-0 adb libusb-1.0-0 \
+                 gcc git pkg-config meson ninja-build libsdl2-dev \
+                 libavcodec-dev libavdevice-dev libavformat-dev libavutil-dev \
+                 libswresample-dev libusb-1.0-0-dev
+
+git clone https://github.com/imzlh/scrplay
+cd scrplay
+
+# the prebuilt device-side server (server/scrplay-server) is tracked in the
+# repository, so building the client needs no Android SDK
+meson setup build -Dcompile_server=false
+ninja -C build
+
+# start game mode (development build)
+./run-game.sh            # equivalent to: build/app/scrplay --game-mode
 ```
-Injecting input events requires the caller (or the source of the instrumentation, if any) to have the INJECT_EVENTS permission.
-```
 
-In that case, you need to enable [an additional option][control] `USB debugging
-(Security Settings)` (this is an item different from `USB debugging`) to control
-it using a keyboard and mouse. Rebooting the device is necessary once this
-option is set.
+`run-game.sh` sets `SCRPLAY_SERVER_PATH`/`SCRPLAY_ICON_PATH` to the in-repo
+server and icon, exports `SDL_IM_MODULE`/`XMODIFIERS` for fcitx5/ibus when
+they are unset (so the editor can type Chinese under X11/XWayland), and execs
+`build/app/scrplay --game-mode` with any extra arguments you pass. See
+[doc/game-mode.md](doc/game-mode.md) for the CLI options, the editor, and the
+profile file format.
 
-[control]: https://github.com/Genymobile/scrcpy/issues/70#issuecomment-373286323
+To use scrplay as a plain mirror, run `./build/app/scrplay` (or
+`./run x [options]`) without `--game-mode`; all upstream options and
+[docs](#user-documentation) apply.
 
-Note that USB debugging is not required to run scrcpy in [OTG mode](doc/otg.md).
+Full build instructions (other platforms, server from source, install):
+[doc/build.md](doc/build.md).
 
+## Configuration
 
-## Get the app
+| Path | Content |
+| --- | --- |
+| `~/.config/scrplay/gameprofiles/*.profile` | game mode profiles (one file per profile) |
+| `~/.config/scrplay/gameui.ini` | ImGui window layout of the editor/HUD |
+| `$XDG_CONFIG_HOME/scrplay/` | used instead when `XDG_CONFIG_HOME` is set |
+| Windows | `%APPDATA%\scrplay\scrplay\` (SDL pref path) |
 
- - [Linux](doc/linux.md)
- - [Windows](doc/windows.md) (read [how to run](doc/windows.md#run))
- - [macOS](doc/macos.md)
-
-
-## Must-know tips
-
- - [Reducing resolution](doc/video.md#size) may greatly improve performance
-   (`scrcpy -m1024`)
- - [_Right-click_](doc/mouse.md#mouse-bindings) triggers `BACK`
- - [_Middle-click_](doc/mouse.md#mouse-bindings) triggers `HOME`
- - <kbd>Alt</kbd>+<kbd>f</kbd> toggles [fullscreen](doc/window.md#fullscreen)
- - There are many other [shortcuts](doc/shortcuts.md)
-
-
-## Usage examples
-
-There are a lot of options, [documented](#user-documentation) in separate pages.
-Here are just some common examples.
-
- - Capture the screen in H.265 (better quality), limit the size to 1920, limit
-   the frame rate to 60fps, disable audio, and control the device by simulating
-   a physical keyboard:
-
-    ```bash
-    scrcpy --video-codec=h265 --max-size=1920 --max-fps=60 --no-audio --keyboard=uhid
-    scrcpy --video-codec=h265 -m1920 --max-fps=60 --no-audio -K  # short version
-    ```
-
- - Start VLC in a new virtual display (separate from the device display):
-
-    ```bash
-    scrcpy --new-display=1920x1080 --start-app=org.videolan.vlc
-    ```
-
- - Record the device camera in H.265 at 1920x1080 (and microphone) to an MP4
-   file:
-
-    ```bash
-    scrcpy --video-source=camera --video-codec=h265 --camera-size=1920x1080 --record=file.mp4
-    ```
-
- - Capture the device front camera and expose it as a webcam on the computer (on
-   Linux):
-
-    ```bash
-    scrcpy --video-source=camera --camera-size=1920x1080 --camera-facing=front --v4l2-sink=/dev/video2 --no-playback
-    ```
-
- - Control the device without mirroring by simulating a physical keyboard and
-   mouse (USB debugging not required):
-
-    ```bash
-    scrcpy --otg
-    ```
-
- - Control the device using gamepad controllers plugged into the computer:
-
-    ```bash
-    scrcpy --gamepad=uhid
-    scrcpy -G  # short version
-    ```
+An existing `~/.config/scrcpy/` directory is migrated automatically to
+`~/.config/scrplay/` on first run.
 
 ## User documentation
 
-The application provides a lot of features and configuration options. They are
-documented in the following pages:
-
+ - [Game mode (游戏模式手册)](doc/game-mode.md)
  - [Connection](doc/connection.md)
  - [Video](doc/video.md)
  - [Audio](doc/audio.md)
@@ -157,55 +145,21 @@ documented in the following pages:
  - [Camera](doc/camera.md)
  - [Video4Linux](doc/v4l2.md)
  - [Shortcuts](doc/shortcuts.md)
-
-
-## Resources
-
- - [FAQ](FAQ.md)
- - [Translations][wiki] (not necessarily up to date)
- - [Build instructions](doc/build.md)
+ - [Build](doc/build.md)
  - [Developers](doc/develop.md)
 
-[wiki]: https://github.com/Genymobile/scrcpy/wiki
+For troubleshooting, read the [FAQ](FAQ.md).
 
+## Attribution
 
-## Articles
+scrplay is based on [Genymobile/scrcpy](https://github.com/Genymobile/scrcpy)
+v3.3.4, licensed under the Apache License, Version 2.0, and retains the
+upstream copyright notices. The device-side server binary
+(`server/scrplay-server`) is an **unmodified upstream build**: it keeps the
+`com.genymobile.scrcpy` Java package and the upstream wire protocol.
 
-- [Introducing scrcpy][article-intro]
-- [Scrcpy now works wirelessly][article-tcpip]
-- [Scrcpy 2.0, with audio][article-scrcpy2]
-
-[article-intro]: https://blog.rom1v.com/2018/03/introducing-scrcpy/
-[article-tcpip]: https://www.genymotion.com/blog/open-source-project-scrcpy-now-works-wirelessly/
-[article-scrcpy2]: https://blog.rom1v.com/2023/03/scrcpy-2-0-with-audio/
-
-## Contact
-
-You can open an [issue] for bug reports, feature requests or general questions.
-
-For bug reports, please read the [FAQ](FAQ.md) first, you might find a solution
-to your problem immediately.
-
-[issue]: https://github.com/Genymobile/scrcpy/issues
-
-You can also use:
-
- - Reddit: [`r/scrcpy`](https://www.reddit.com/r/scrcpy)
- - BlueSky: [`@scrcpy.bsky.social`](https://bsky.app/profile/scrcpy.bsky.social)
- - Twitter: [`@scrcpy_app`](https://twitter.com/scrcpy_app)
-
-
-## Donate
-
-I'm [@rom1v](https://github.com/rom1v), the author and maintainer of _scrcpy_.
-
-If you appreciate this application, you can [support my open source
-work][donate]:
- - [GitHub Sponsors](https://github.com/sponsors/rom1v)
- - [Liberapay](https://liberapay.com/rom1v/)
- - [PayPal](https://paypal.me/rom2v)
-
-[donate]: https://blog.rom1v.com/about/#support-my-open-source-work
+All credit for the mirroring and control core belongs to the upstream scrcpy
+authors; see [CHANGELOG.md](CHANGELOG.md) for what this fork changes.
 
 ## License
 

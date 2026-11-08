@@ -1,6 +1,6 @@
-# Build scrcpy
+# Build scrplay
 
-Here are the instructions to build _scrcpy_ (client and server).
+Here are the instructions to build _scrplay_ (client and server).
 
 If you just want to build and install the latest release, follow the simplified
 process described in [doc/linux.md](linux.md).
@@ -28,7 +28,7 @@ the following files to a directory accessible from your `PATH`:
  - `AdbWinApi.dll`
  - `AdbWinUsbApi.dll`
 
-It is also available in scrcpy releases.
+It is also available in scrplay releases.
 
 The client requires [FFmpeg] and [LibSDL2]. Just follow the instructions.
 
@@ -188,8 +188,8 @@ See [pierlon/scrcpy-docker](https://github.com/pierlon/scrcpy-docker).
 **As a non-root user**, clone the project:
 
 ```bash
-git clone https://github.com/Genymobile/scrcpy
-cd scrcpy
+git clone https://github.com/imzlh/scrplay
+cd scrplay
 ```
 
 
@@ -233,17 +233,17 @@ install` must be run as root)._
 
 #### Option 2: Use prebuilt server
 
- - [`scrcpy-server-v3.3.4`][direct-scrcpy-server]  
+ - [`scrcpy-server-v3.3.4`][direct-scrplay-server]  
    <sub>SHA-256: `8588238c9a5a00aa542906b6ec7e6d5541d9ffb9b5d0f6e1bc0e365e2303079e`</sub>
 
-[direct-scrcpy-server]: https://github.com/Genymobile/scrcpy/releases/download/v3.3.4/scrcpy-server-v3.3.4
+[direct-scrplay-server]: https://github.com/Genymobile/scrcpy/releases/download/v3.3.4/scrcpy-server-v3.3.4
 
 Download the prebuilt server somewhere, and specify its path during the Meson
 configuration:
 
 ```bash
 meson setup x --buildtype=release --strip -Db_lto=true \
-    -Dprebuilt_server=/path/to/scrcpy-server
+    -Dprebuilt_server=/path/to/scrplay-server
 ninja -Cx  # DO NOT RUN AS ROOT
 ```
 
@@ -260,7 +260,7 @@ The server only works with a matching client version (this server works with the
 
 ### Install
 
-After a successful build, you can install _scrcpy_ on the system:
+After a successful build, you can install _scrplay_ on the system:
 
 ```bash
 sudo ninja -Cx install    # without sudo on Windows
@@ -268,14 +268,14 @@ sudo ninja -Cx install    # without sudo on Windows
 
 This installs several files:
 
- - `/usr/local/bin/scrcpy` (main app)
- - `/usr/local/share/scrcpy/scrcpy-server` (server to push to the device)
- - `/usr/local/share/man/man1/scrcpy.1` (manpage)
+ - `/usr/local/bin/scrplay` (main app)
+ - `/usr/local/share/scrplay/scrplay-server` (server to push to the device)
+ - `/usr/local/share/man/man1/scrplay.1` (manpage)
  - `/usr/local/share/icons/hicolor/256x256/apps/icon.png` (app icon)
- - `/usr/local/share/zsh/site-functions/_scrcpy` (zsh completion)
- - `/usr/local/share/bash-completion/completions/scrcpy` (bash completion)
+ - `/usr/local/share/zsh/site-functions/_scrplay` (zsh completion)
+ - `/usr/local/share/bash-completion/completions/scrplay` (bash completion)
 
-You can then run `scrcpy`.
+You can then run `scrplay`.
 
 
 ### Uninstall

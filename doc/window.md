@@ -5,7 +5,7 @@
 To disable window (may be useful for recording or for playing audio only):
 
 ```bash
-scrcpy --no-window --record=file.mp4
+scrplay --no-window --record=file.mp4
 # Ctrl+C to interrupt
 ```
 
@@ -14,7 +14,7 @@ scrcpy --no-window --record=file.mp4
 By default, the window title is the device model. It can be changed:
 
 ```bash
-scrcpy --window-title='My device'
+scrplay --window-title='My device'
 ```
 
 ## Position and size
@@ -22,7 +22,7 @@ scrcpy --window-title='My device'
 The initial window position and size may be specified:
 
 ```bash
-scrcpy --window-x=100 --window-y=100 --window-width=800 --window-height=600
+scrplay --window-x=100 --window-y=100 --window-width=800 --window-height=600
 ```
 
 ## Borderless
@@ -30,7 +30,7 @@ scrcpy --window-x=100 --window-y=100 --window-width=800 --window-height=600
 To disable window decorations:
 
 ```bash
-scrcpy --window-borderless
+scrplay --window-borderless
 ```
 
 ## Always on top
@@ -38,7 +38,7 @@ scrcpy --window-borderless
 To keep the window always on top:
 
 ```bash
-scrcpy --always-on-top
+scrplay --always-on-top
 ```
 
 ## Fullscreen
@@ -46,8 +46,8 @@ scrcpy --always-on-top
 The app may be started directly in fullscreen:
 
 ```bash
-scrcpy --fullscreen
-scrcpy -f   # short version
+scrplay --fullscreen
+scrplay -f   # short version
 ```
 
 Fullscreen mode can then be toggled dynamically with <kbd>MOD</kbd>+<kbd>f</kbd>
@@ -56,9 +56,9 @@ Fullscreen mode can then be toggled dynamically with <kbd>MOD</kbd>+<kbd>f</kbd>
 
 ## Disable screensaver
 
-By default, _scrcpy_ does not prevent the screensaver from running on the
+By default, _scrplay_ does not prevent the screensaver from running on the
 computer. To disable it:
 
 ```bash
-scrcpy --disable-screensaver
+scrplay --disable-screensaver
 ```

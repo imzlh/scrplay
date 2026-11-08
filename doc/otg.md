@@ -1,7 +1,7 @@
 # OTG
 
-By default, _scrcpy_ injects input events at the Android API level. As an
-alternative, it is possible to send HID events, so that scrcpy behaves as if it
+By default, _scrplay_ injects input events at the Android API level. As an
+alternative, it is possible to send HID events, so that scrplay behaves as if it
 was a [physical keyboard] and/or a [physical mouse] connected to the Android
 device (see [keyboard](keyboard.md) and [mouse](mouse.md)).
 
@@ -15,30 +15,30 @@ necessary). In this mode, video and audio are disabled, and `--keyboard=aoa` and
 `--mouse=aoa` are implicitly set. However, gamepads are disabled by default, so
 `--gamepad=aoa` (or `-G` in OTG mode) must be explicitly set.
 
-Therefore, it is possible to run _scrcpy_ with only physical keyboard, mouse and
+Therefore, it is possible to run _scrplay_ with only physical keyboard, mouse and
 gamepad simulation, as if the computer keyboard, mouse and gamepads were plugged
 directly to the device via an OTG cable.
 
 To enable OTG mode:
 
 ```bash
-scrcpy --otg
+scrplay --otg
 # Pass the serial if several USB devices are available
-scrcpy --otg -s 0123456789abcdef
+scrplay --otg -s 0123456789abcdef
 ```
 
 It is possible to disable keyboard or mouse:
 
 ```bash
-scrcpy --otg --keyboard=disabled
-scrcpy --otg --mouse=disabled
+scrplay --otg --keyboard=disabled
+scrplay --otg --mouse=disabled
 ```
 
 and to enable gamepads:
 
 ```bash
-scrcpy --otg --gamepad=aoa
-scrcpy --otg -G  # short version
+scrplay --otg --gamepad=aoa
+scrplay --otg -G  # short version
 ```
 
 It only works if the device is connected over USB.
@@ -59,9 +59,9 @@ is enabled, then OTG mode is not necessary.
 Instead, disable video and audio, and select UHID (or AOA):
 
 ```bash
-scrcpy --no-video --no-audio --keyboard=uhid --mouse=uhid --gamepad=uhid
-scrcpy --no-video --no-audio -KMG  # short version
-scrcpy --no-video --no-audio --keyboard=aoa --mouse=aoa --gamepad=aoa
+scrplay --no-video --no-audio --keyboard=uhid --mouse=uhid --gamepad=uhid
+scrplay --no-video --no-audio -KMG  # short version
+scrplay --no-video --no-audio --keyboard=aoa --mouse=aoa --gamepad=aoa
 ```
 
 One benefit of UHID is that it also works wirelessly.

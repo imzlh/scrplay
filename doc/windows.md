@@ -20,7 +20,7 @@ and extract it.
 
 ### From a package manager
 
-From [WinGet] (ADB and other dependencies will be installed alongside scrcpy):
+From [WinGet] (ADB and other dependencies will be installed alongside scrplay):
 
 ```bash
 winget install --exact Genymobile.scrcpy
@@ -51,50 +51,50 @@ _See [build.md](build.md) to build and install the app manually._
 
 _Make sure that your device meets the [prerequisites](/README.md#prerequisites)._
 
-Scrcpy is a command line application: it is mainly intended to be executed from
+Scrplay is a command line application: it is mainly intended to be executed from
 a terminal with command line arguments.
 
 To open a terminal at the expected location, double-click on
-`open_a_terminal_here.bat` in your scrcpy directory, then type your command. For
+`open_a_terminal_here.bat` in your scrplay directory, then type your command. For
 example, without arguments:
 
 ```bash
-scrcpy
+scrplay
 ```
 
 or with arguments (here to disable audio and record to `file.mkv`):
 
 ```
-scrcpy --no-audio --record=file.mkv
+scrplay --no-audio --record=file.mkv
 ```
 
 Documentation for command line arguments is available:
- - `scrcpy --help`
+ - `scrplay --help`
  - on [github](/README.md)
 
-To start scrcpy directly without opening a terminal, double-click on one of
+To start scrplay directly without opening a terminal, double-click on one of
 these files:
- - `scrcpy-console.bat`: start with a terminal open (it will close when scrcpy
+ - `scrplay-console.bat`: start with a terminal open (it will close when scrplay
    terminates, unless an error occurs);
- - `scrcpy-noconsole.vbs`: start without a terminal (but you won't see any error
+ - `scrplay-noconsole.vbs`: start without a terminal (but you won't see any error
    message).
 
-_Avoid double-clicking on `scrcpy.exe` directly: on error, the terminal would
+_Avoid double-clicking on `scrplay.exe` directly: on error, the terminal would
 close immediately and you won't have time to read any error message (this
-executable is intended to be run from the terminal). Use `scrcpy-console.bat`
+executable is intended to be run from the terminal). Use `scrplay-console.bat`
 instead._
 
-If you plan to always use the same arguments, create a file `myscrcpy.bat`
+If you plan to always use the same arguments, create a file `myscrplay.bat`
 (enable [show file extensions] to avoid confusion) containing your command, For
 example:
 
 ```bash
-scrcpy --prefer-text --turn-screen-off --stay-awake
+scrplay --prefer-text --turn-screen-off --stay-awake
 ```
 
 [show file extensions]: https://www.howtogeek.com/205086/beginner-how-to-make-windows-show-file-extensions/
 
 Then just double-click on that file.
 
-You could also edit (a copy of) `scrcpy-console.bat` or `scrcpy-noconsole.vbs`
+You could also edit (a copy of) `scrplay-console.bat` or `scrplay-noconsole.vbs`
 to add some arguments.

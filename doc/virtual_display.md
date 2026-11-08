@@ -5,10 +5,10 @@
 To mirror a new virtual display instead of the device screen:
 
 ```bash
-scrcpy --new-display=1920x1080
-scrcpy --new-display=1920x1080/420  # force 420 dpi
-scrcpy --new-display         # use the main display size and density
-scrcpy --new-display=/240    # use the main display size and 240 dpi
+scrplay --new-display=1920x1080
+scrplay --new-display=1920x1080/420  # force 420 dpi
+scrplay --new-display         # use the main display size and density
+scrplay --new-display=/240    # use the main display size and 240 dpi
 ```
 
 The new virtual display is destroyed on exit.
@@ -25,14 +25,14 @@ app](device.md#start-android-app).
 For example:
 
 ```bash
-scrcpy --new-display=1920x1080 --start-app=org.videolan.vlc
+scrplay --new-display=1920x1080 --start-app=org.videolan.vlc
 ```
 
 The app may itself be a launcher. For example, to run the open source [Fossify
 Launcher]:
 
 ```bash
-scrcpy --new-display=1920x1080 --no-vd-system-decorations --start-app=org.fossify.home
+scrplay --new-display=1920x1080 --no-vd-system-decorations --start-app=org.fossify.home
 ```
 
 [Fossify Launcher]: https://f-droid.org/en/packages/org.fossify.home/
@@ -44,7 +44,7 @@ By default, virtual display system decorations are enabled. To disable them, use
 `--no-vd-system-decorations`:
 
 ```
-scrcpy --new-display --no-vd-system-decorations
+scrplay --new-display --no-vd-system-decorations
 ```
 
 This is useful for some devices which might display a broken UI, or to disable
@@ -61,7 +61,7 @@ By default, when the virtual display is closed, the running apps are destroyed.
 To move them to the main display instead, use:
 
 ```
-scrcpy --new-display --no-vd-destroy-content
+scrplay --new-display --no-vd-destroy-content
 ```
 
 
@@ -72,6 +72,6 @@ By default, the virtual display IME appears on the default display.
 To make it appear on the local display, use `--display-ime-policy=local`:
 
 ```bash
-scrcpy --display-id=1 --display-ime-policy=local
-scrcpy --new-display --display-ime-policy=local
+scrplay --display-id=1 --display-ime-policy=local
+scrplay --new-display --display-ime-policy=local
 ```

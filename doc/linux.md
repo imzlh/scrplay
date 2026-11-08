@@ -14,14 +14,17 @@ Download a static build of the [latest release]:
 
 and extract it.
 
-_Static builds of scrcpy for Linux are still experimental._
+_Static builds of scrplay for Linux are still experimental._
 
 
 ### From your package manager
 
-<a href="https://repology.org/project/scrcpy/versions"><img src="https://repology.org/badge/vertical-allrepos/scrcpy.svg" alt="Packaging status" align="right"></a>
+Scrplay is a fork and is **not packaged in distributions yet**: build it from
+[source](build.md) instead.
 
-Scrcpy is packaged in several distributions and package managers:
+For reference, the upstream [scrcpy](https://github.com/Genymobile/scrcpy)
+project (from which scrplay is derived, but which it does not replace) is
+packaged in several distributions:
 
  - Debian/Ubuntu: ~~`apt install scrcpy`~~ _(obsolete version)_
  - Arch Linux: `pacman -S scrcpy`
@@ -29,6 +32,8 @@ Scrcpy is packaged in several distributions and package managers:
  - Gentoo: `emerge scrcpy`
  - Snap: ~~`snap install scrcpy`~~ _(obsolete version)_
  - … (see [repology](https://repology.org/project/scrcpy/versions))
+
+Note that these packages install the upstream `scrcpy` binary, not `scrplay`.
 
 
 ### From an install script
@@ -49,8 +54,8 @@ Then clone the repo and execute the installation script
 ([source](/install_release.sh)):
 
 ```bash
-git clone https://github.com/Genymobile/scrcpy
-cd scrcpy
+git clone https://github.com/imzlh/scrplay
+cd scrplay
 ./install_release.sh
 ```
 
@@ -81,16 +86,16 @@ _Make sure that your device meets the [prerequisites](/README.md#prerequisites).
 Once installed, run from a terminal:
 
 ```bash
-scrcpy
+scrplay
 ```
 
 or with arguments (here to disable audio and record to `file.mkv`):
 
 ```bash
-scrcpy --no-audio --record=file.mkv
+scrplay --no-audio --record=file.mkv
 ```
 
 Documentation for command line arguments is available:
- - `man scrcpy`
- - `scrcpy --help`
+ - `man scrplay`
+ - `scrplay --help`
  - on [github](/README.md)
