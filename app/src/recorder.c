@@ -823,7 +823,7 @@ error_free_filename:
 bool
 sc_recorder_start(struct sc_recorder *recorder) {
     bool ok = sc_thread_create(&recorder->thread, run_recorder,
-                               "scrplay-recorder", recorder);
+                               "scrplay-rec", recorder);
     if (!ok) {
         LOGE("Could not start recorder thread");
         return false;
