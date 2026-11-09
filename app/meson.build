@@ -79,7 +79,11 @@ conf = configuration_data()
 
 conf.set('_POSIX_C_SOURCE', '200809L')
 conf.set('_XOPEN_SOURCE', '700')
-conf.set('_GNU_SOURCE', true)
+# _GNU_SOURCE must be defined before any libc header; g++ predefines it for
+# C++ sources, so pass it as a C-only compiler flag instead of config.h,
+# otherwise the C++ translation units (imgui_shim.cpp) warn about a
+# redefinition.
+add_project_arguments('-D_GNU_SOURCE', language: 'c')
 
 if host_machine.system() == 'windows'
     windows = import('windows')
